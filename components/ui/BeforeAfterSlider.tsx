@@ -88,10 +88,13 @@ export function BeforeAfterSlider({
         </div>
       </div>
 
-      {/* Before Image (Foreground, clipped) */}
+      {/* Before Image (Foreground, masked) */}
       <div 
         className="absolute inset-0 right-0 overflow-hidden"
-        style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
+        style={{ 
+          WebkitMaskImage: `linear-gradient(to right, black calc(${sliderPosition}% - 20px), transparent calc(${sliderPosition}% + 20px))`,
+          maskImage: `linear-gradient(to right, black calc(${sliderPosition}% - 20px), transparent calc(${sliderPosition}% + 20px))`
+        }}
       >
         <Image
           src={beforeImage}
@@ -108,11 +111,15 @@ export function BeforeAfterSlider({
 
       {/* Slider Line & Button */}
       <div 
-        className="absolute top-0 bottom-0 w-0.5 bg-timber-beige shadow-lg z-10 cursor-ew-resize interactive"
+        className="absolute top-0 bottom-0 w-1 bg-[#8b5a2b]/50 shadow-[0_0_15px_rgba(0,0,0,0.5)] z-10 cursor-ew-resize interactive backdrop-blur-sm"
         style={{ left: `${sliderPosition}%` }}
       >
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-10 bg-timber-teal text-timber-beige rounded-full flex items-center justify-center shadow-lg cursor-grab active:cursor-grabbing border-2 border-timber-beige">
-          <ArrowLeftRight size={18} />
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl cursor-grab active:cursor-grabbing border-4 border-[#5c4033] bg-[#d4a373] overflow-hidden group">
+          {/* Concentric rings simulating wood cross-section */}
+          <div className="absolute inset-1 rounded-full border-[1.5px] border-[#8b5a2b]/40 group-active:scale-95 transition-transform duration-300"></div>
+          <div className="absolute inset-2.5 rounded-full border-[1px] border-[#8b5a2b]/30 group-active:scale-90 transition-transform duration-300"></div>
+          <div className="absolute inset-4 rounded-full border-[1.5px] border-[#8b5a2b]/40 group-active:scale-75 transition-transform duration-300"></div>
+          <ArrowLeftRight size={18} className="text-[#3e2723] relative z-10 opacity-80" />
         </div>
       </div>
     </div>

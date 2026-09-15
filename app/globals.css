@@ -12,6 +12,8 @@
   --font-sans: var(--font-inter);
   --font-serif: var(--font-playfair);
 
+  --ease-organic: cubic-bezier(0.22, 1, 0.36, 1);
+
   --animate-fade-in: fade-in 1s ease-out forwards;
   --animate-fade-in-up: fade-in-up 1s ease-out forwards;
   --animate-grain-shift: grain-shift 8s ease-in-out infinite;

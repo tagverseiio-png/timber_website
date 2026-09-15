@@ -21,7 +21,7 @@ export function HeroSection() {
   }, []);
 
   // Scroll Parallax
-  const { scrollYProgress } = useScroll({
+  const { scrollYProgress, scrollY } = useScroll({
     target: containerRef,
     offset: ["start start", "end start"],
   });
@@ -31,6 +31,7 @@ export function HeroSection() {
   const logsFrontScrollY = useTransform(scrollYProgress, [0, 1], [0, -100]);
   const logsBackScrollY = useTransform(scrollYProgress, [0, 1], [0, 50]);
   const opacityTransform = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
+  const scrollCueOpacity = useTransform(scrollY, [0, 150], [1, 0]);
 
   // Mouse Parallax & Lighting
   const mouseX = useMotionValue(0);
@@ -70,13 +71,21 @@ export function HeroSection() {
     },
   };
 
-  const textRevealVariants: Variants = {
-    hidden: { clipPath: "inset(0% 100% 0% 0%)", opacity: 0, textShadow: "0px 0px 0px rgba(0,0,0,0)" },
+  const textContainerVariants: Variants = {
+    hidden: { opacity: 0 },
     visible: {
-      clipPath: "inset(0% 0% 0% 0%)",
       opacity: 1,
-      textShadow: "2px 2px 5px rgba(0,0,0,0.5)",
-      transition: { duration: 1.5, ease: "circOut" },
+      transition: { staggerChildren: 0.08, delayChildren: 0.8 },
+    },
+  };
+
+  const wordVariants: Variants = {
+    hidden: { opacity: 0, y: 30, filter: "blur(4px)" },
+    visible: {
+      opacity: 1,
+      y: 0,
+      filter: "blur(0px)",
+      transition: { duration: 1.2, ease: [0.22, 1, 0.36, 1] },
     },
   };
 
@@ -200,22 +209,28 @@ export function HeroSection() {
           Premium Timber Furniture
         </motion.p>
 
-        <div className="overflow-hidden mb-2">
-          <motion.h1
-            variants={textRevealVariants}
-            className="font-serif text-5xl sm:text-7xl md:text-8xl lg:text-9xl text-timber-beige tracking-tight leading-[1.1]"
-          >
-            Crafted by <span className="italic">Nature.</span>
-          </motion.h1>
-        </div>
-        <div className="overflow-hidden mb-8">
-          <motion.h1
-            variants={textRevealVariants}
-            className="font-serif text-5xl sm:text-7xl md:text-8xl lg:text-9xl text-timber-beige tracking-tight leading-[1.1]"
-          >
-            Designed for Life.
-          </motion.h1>
-        </div>
+        <motion.div variants={textContainerVariants} className="overflow-hidden mb-2 flex gap-4 flex-wrap justify-center lg:justify-start">
+          {["Crafted", "by", "Nature."].map((word, i) => (
+            <motion.h1
+              key={i}
+              variants={wordVariants}
+              className={`font-serif text-5xl sm:text-7xl md:text-8xl lg:text-9xl text-timber-beige tracking-tight leading-[1.1] ${i === 2 ? 'italic' : ''}`}
+            >
+              {word}
+            </motion.h1>
+          ))}
+        </motion.div>
+        <motion.div variants={textContainerVariants} className="overflow-hidden mb-8 flex gap-4 flex-wrap justify-center lg:justify-start">
+          {["Designed", "for", "Life."].map((word, i) => (
+            <motion.h1
+              key={i}
+              variants={wordVariants}
+              className="font-serif text-5xl sm:text-7xl md:text-8xl lg:text-9xl text-timber-beige tracking-tight leading-[1.1]"
+            >
+              {word}
+            </motion.h1>
+          ))}
+        </motion.div>
 
         <motion.p
           variants={fadeVariants}
@@ -252,16 +267,23 @@ export function HeroSection() {
 
       {/* Scroll Indicator */}
       <motion.div
-        variants={fadeVariants}
+        style={{ opacity: scrollCueOpacity }}
         className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-10"
       >
-        <span className="text-[10px] tracking-[0.2em] text-timber-beige/70 uppercase">Scroll to Explore</span>
-        <div className="w-[1px] h-12 bg-timber-beige/30 relative overflow-hidden">
+        <motion.span variants={fadeVariants} className="text-[10px] tracking-[0.2em] text-timber-beige/70 uppercase">Scroll to Explore</motion.span>
+        <div className="w-[1px] h-16 bg-timber-beige/30 relative flex justify-center">
           <motion.div
-            animate={{ y: ["-100%", "200%"] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="absolute inset-0 w-full h-1/2 bg-timber-teal"
-          />
+            animate={{ 
+              y: ["0%", "200%", "0%"],
+              scale: [1, 1.2, 1],
+              opacity: [0.5, 1, 0.5]
+            }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-0 w-3 h-3 rounded-full border-2 border-timber-beige bg-timber-darkwood shadow-[0_0_10px_rgba(245,240,230,0.5)] -translate-x-1/2"
+          >
+            {/* Inner wood ring dot */}
+            <div className="absolute inset-0 m-auto w-1 h-1 rounded-full bg-timber-beige opacity-80" />
+          </motion.div>
         </div>
       </motion.div>
     </motion.section>

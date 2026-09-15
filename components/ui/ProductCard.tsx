@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Heart, ShoppingBag, Eye } from "lucide-react";
+import { motion } from "framer-motion";
 
 export interface Product {
   id: string;
@@ -32,12 +33,12 @@ export function ProductCard({ product }: ProductCardProps) {
     >
       <div className="relative aspect-[3/4] bg-timber-cream overflow-hidden rounded-sm mb-4">
         {/* Images */}
-        <Link href={`/shop/${product.id}`} className="block w-full h-full">
+        <Link href={`/shop/${product.id}`} className="block w-full h-full relative">
           <Image
             src={product.image}
             alt={product.name}
             fill
-            className={`object-cover transition-opacity duration-700 ease-in-out ${isHovered && product.hoverImage ? "opacity-0" : "opacity-100"}`}
+            className={`object-cover transition-all duration-[800ms] ease-[var(--ease-organic)] ${isHovered ? "scale-105" : "scale-100"} ${isHovered && product.hoverImage ? "opacity-0" : "opacity-100"}`}
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
           {product.hoverImage && (
@@ -45,10 +46,20 @@ export function ProductCard({ product }: ProductCardProps) {
               src={product.hoverImage}
               alt={`${product.name} alternate view`}
               fill
-              className={`object-cover transition-opacity duration-700 ease-in-out ${isHovered ? "opacity-100 scale-105" : "opacity-0 scale-100"}`}
+              className={`object-cover transition-all duration-[800ms] ease-[var(--ease-organic)] ${isHovered ? "opacity-100 scale-105" : "opacity-0 scale-100"}`}
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           )}
+
+          {/* Grain Texture Overlay */}
+          <div className={`absolute inset-0 z-10 pointer-events-none mix-blend-multiply transition-opacity duration-700 ease-in-out ${isHovered ? "opacity-15" : "opacity-0"}`}>
+            <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" preserveAspectRatio="none">
+              <filter id={`noise-${product.id}`}>
+                <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/>
+              </filter>
+              <rect width="100%" height="100%" filter={`url(#noise-${product.id})`}/>
+            </svg>
+          </div>
         </Link>
 
         {/* Tags */}
@@ -79,8 +90,25 @@ export function ProductCard({ product }: ProductCardProps) {
 
       {/* Info */}
       <div className="flex flex-col">
-        <div className="text-xs text-timber-muted uppercase tracking-wider mb-1">
-          {product.woodType}
+        <div className="relative inline-block self-start mb-1">
+          <span className="text-xs text-timber-muted uppercase tracking-wider relative z-10">
+            {product.woodType}
+          </span>
+          <svg 
+            className="absolute -bottom-1 left-0 w-full h-[6px] text-timber-teal stroke-current overflow-visible z-0" 
+            viewBox="0 0 100 10" 
+            preserveAspectRatio="none"
+          >
+            <motion.path 
+              d="M0,5 Q20,8 40,3 T80,7 T100,5" 
+              strokeWidth="2" 
+              fill="none" 
+              strokeLinecap="round"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: isHovered ? 1 : 0, opacity: isHovered ? 1 : 0 }}
+              transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            />
+          </svg>
         </div>
         <Link href={`/shop/${product.id}`} className="font-serif text-lg text-timber-darkwood hover:text-timber-teal transition-colors mb-1">
           {product.name}
