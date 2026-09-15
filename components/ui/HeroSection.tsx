@@ -15,9 +15,18 @@ export function HeroSection() {
   const [isRevealed, setIsRevealed] = useState(false);
 
   useEffect(() => {
-    // Trigger reveal sequence after a short delay
-    const timer = setTimeout(() => setIsRevealed(true), 500);
-    return () => clearTimeout(timer);
+    const hasSeenIntro = sessionStorage.getItem("hasSeenCinematicIntro");
+    
+    if (hasSeenIntro) {
+      // Trigger reveal sequence after a short delay normally
+      const timer = setTimeout(() => setIsRevealed(true), 500);
+      return () => clearTimeout(timer);
+    } else {
+      // Wait for CinematicIntro to finish
+      const handleIntro = () => setIsRevealed(true);
+      window.addEventListener("introComplete", handleIntro);
+      return () => window.removeEventListener("introComplete", handleIntro);
+    }
   }, []);
 
   // Scroll Parallax
@@ -159,7 +168,7 @@ export function HeroSection() {
           onMouseEnter={() => setCursorState("EXPLORE", false)}
           onMouseLeave={resetCursor}
         />
-        
+
         {/* Parallax Logs (Back) */}
         <motion.div
           style={{ y: logsBackScrollY, x: grainX }}
@@ -252,7 +261,7 @@ export function HeroSection() {
             <ArrowRight size={16} className="relative z-10 group-hover:translate-x-1 group-hover:text-white transition-all duration-300" />
             <div className="absolute inset-0 bg-timber-teal transform scale-x-0 origin-left group-hover:scale-x-100 transition-transform duration-500 ease-out" />
           </Link>
-          
+
           <Link
             href="/about"
             onMouseEnter={() => setCursorState("DISCOVER", false)}
@@ -273,7 +282,7 @@ export function HeroSection() {
         <motion.span variants={fadeVariants} className="text-[10px] tracking-[0.2em] text-timber-beige/70 uppercase">Scroll to Explore</motion.span>
         <div className="w-[1px] h-16 bg-timber-beige/30 relative flex justify-center">
           <motion.div
-            animate={{ 
+            animate={{
               y: ["0%", "200%", "0%"],
               scale: [1, 1.2, 1],
               opacity: [0.5, 1, 0.5]

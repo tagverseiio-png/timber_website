@@ -4,6 +4,7 @@ import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { TimberStory } from "@/components/ui/TimberStory";
 import { ProductCard } from "@/components/ui/ProductCard";
 import { StatsStrip } from "@/components/ui/StatsStrip";
+import { CinematicIntro } from "@/components/ui/CinematicIntro";
 import { WoodShavingCursor } from "@/components/layout/WoodShavingCursor";
 import Image from "next/image";
 
@@ -41,6 +42,7 @@ const featuredProducts = [
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col bg-timber-beige">
+      <CinematicIntro />
       <WoodShavingCursor />
       {/* Hero Section */}
       <HeroSection />
