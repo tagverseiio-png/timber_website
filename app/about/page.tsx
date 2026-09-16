@@ -2,22 +2,52 @@
 
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import Image from "next/image";
+import { motion } from "framer-motion";
 
 export default function AboutPage() {
   return (
     <div className="bg-timber-beige min-h-screen">
       {/* Hero */}
-      <section className="relative h-[60vh] flex items-center justify-center -mt-24 pt-24 overflow-hidden">
-        <Image
-          src="https://images.unsplash.com/photo-1582229555627-c10ce76cc638?q=80&w=2000&auto=format&fit=crop"
-          alt="Craftsmanship"
-          fill
-          className="object-cover brightness-75"
-        />
-        <div className="relative z-10 text-center">
+      <section className="relative h-[60vh] flex items-center justify-center -mt-24 pt-24 overflow-hidden group">
+        <motion.div 
+          className="absolute inset-0 w-full h-full"
+          initial={{ scale: 1.1, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 1.5, ease: "easeOut" }}
+        >
+          <motion.div
+            className="absolute inset-0 w-full h-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 2, ease: "easeOut" }}
+          >
+            <Image
+              src="/images/about-first-image.jpeg"
+              alt=""
+              fill
+              className="object-cover blur-2xl opacity-50 scale-110"
+              priority
+            />
+          </motion.div>
+          <motion.div
+            className="w-full h-full relative z-10"
+            whileHover={{ scale: 1.05 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
+            <Image
+              src="/images/about-first-image.jpeg"
+              alt="Craftsmanship"
+              fill
+              className="object-contain brightness-[0.85] drop-shadow-2xl"
+              priority
+            />
+          </motion.div>
+        </motion.div>
+        <div className="relative z-10 text-center pointer-events-none mt-10">
           <ScrollReveal>
-            <h1 className="font-serif text-5xl md:text-7xl text-timber-beige mb-4">Our Story</h1>
-            <p className="text-timber-beige/90 text-lg uppercase tracking-widest">Rooted in Nature</p>
+            <h1 className="font-serif text-5xl md:text-7xl text-timber-darkwood bg-timber-beige/80 px-8 py-4 rounded-xl backdrop-blur-md mb-4 shadow-lg border border-timber-darkwood/10 inline-block">Our Story</h1>
+            <br/>
+            <p className="text-timber-darkwood font-medium text-lg uppercase tracking-widest bg-timber-beige/80 px-6 py-2 rounded-lg backdrop-blur-md inline-block shadow-sm border border-timber-darkwood/10 mt-2">Rooted in Nature</p>
           </ScrollReveal>
         </div>
       </section>
@@ -40,7 +70,7 @@ export default function AboutPage() {
           </ScrollReveal>
           <ScrollReveal direction="left" className="relative aspect-square md:aspect-[4/3]">
             <Image
-              src="https://images.unsplash.com/photo-1611145320501-837acbba39f7?q=80&w=1500&auto=format&fit=crop"
+              src="/images/about1.jpeg"
               alt="Teakwood Craftsmanship"
               fill
               className="object-cover"
@@ -52,7 +82,7 @@ export default function AboutPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center mb-24">
           <ScrollReveal direction="right" className="relative aspect-square md:aspect-[4/3] order-2 md:order-1">
             <Image
-              src="https://images.unsplash.com/photo-1623910271000-5847e3d81dc3?q=80&w=1500&auto=format&fit=crop"
+              src="/images/about2.jpeg"
               alt="Timber Showroom"
               fill
               className="object-cover"
@@ -88,7 +118,7 @@ export default function AboutPage() {
           </ScrollReveal>
           <ScrollReveal direction="left" className="relative aspect-square md:aspect-[4/3]">
             <Image
-              src="https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=2070&auto=format&fit=crop"
+              src="/images/anout3.jpeg"
               alt="Modern Timber Furniture"
               fill
               className="object-cover brightness-90"
