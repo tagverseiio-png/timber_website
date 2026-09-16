@@ -160,7 +160,7 @@ export function HeroSection() {
         className="absolute inset-0 z-0"
       >
         <Image
-          src="https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=2070&auto=format&fit=crop"
+          src="/images/hero-bg.jpg.png"
           alt="Premium Timber Furniture"
           fill
           priority
