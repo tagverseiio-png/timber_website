@@ -24,48 +24,75 @@ export default function AboutPage() {
 
       {/* Content */}
       <section className="py-24 container mx-auto px-6 md:px-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center mb-32">
+        {/* Section 1: Origins */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center mb-24">
           <ScrollReveal direction="right">
-            <h2 className="font-serif text-4xl text-timber-darkwood mb-6">Generations of Craft</h2>
+            <h2 className="font-serif text-4xl text-timber-darkwood mb-6">How It All Began</h2>
             <p className="text-timber-darkwood/80 leading-relaxed mb-4">
-              Timber was born out of a simple belief: that furniture should be built to last a lifetime, 
-              honoring the natural beauty of the materials used. Our journey began in a small workshop, 
-              where our founders learned the traditional techniques of wood joinery from their ancestors.
+              Timber, House of Exclusive was founded in 2005 by Vijayalakshmi (Viji) Saravanan. During a trip to Indonesia to visit her sister, she was captivated by the high-quality, well-designed teak furniture available at reasonable prices.
+            </p>
+            <p className="text-timber-darkwood/80 leading-relaxed mb-4">
+              In a market flooded with MDF, rubberwood, and compressed wood, teakwood furniture stood out as a superior choice due to its antique appearance, near-lifetime durability, and customizable finishes.
             </p>
             <p className="text-timber-darkwood/80 leading-relaxed">
-              Today, we combine those time-honored methods with modern precision, creating pieces that 
-              are both structurally sound and visually striking.
+              Viji had a primary focus on Victorian, Rococo, Gothic, and Chippendale-inspired designs featuring elements such as fluted legs, canopy carvings, Queen Anne legs, and luxurious fabrics.
             </p>
           </ScrollReveal>
-          <ScrollReveal direction="left" className="relative aspect-square md:aspect-[3/4]">
+          <ScrollReveal direction="left" className="relative aspect-square md:aspect-[4/3]">
             <Image
               src="https://images.unsplash.com/photo-1611145320501-837acbba39f7?q=80&w=1500&auto=format&fit=crop"
-              alt="Workshop"
+              alt="Teakwood Craftsmanship"
               fill
               className="object-cover"
             />
           </ScrollReveal>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
-          <ScrollReveal direction="right" className="relative aspect-square md:aspect-[3/4] order-2 md:order-1">
+        {/* Section 2: The Inspiration & Start */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center mb-24">
+          <ScrollReveal direction="right" className="relative aspect-square md:aspect-[4/3] order-2 md:order-1">
             <Image
               src="https://images.unsplash.com/photo-1623910271000-5847e3d81dc3?q=80&w=1500&auto=format&fit=crop"
-              alt="Sustainable Timber"
+              alt="Timber Showroom"
               fill
               className="object-cover"
             />
           </ScrollReveal>
           <ScrollReveal direction="left" className="order-1 md:order-2">
-            <h2 className="font-serif text-4xl text-timber-darkwood mb-6">Sustainable Sourcing</h2>
+            <h2 className="font-serif text-4xl text-timber-darkwood mb-6">From a Home to a Showroom</h2>
             <p className="text-timber-darkwood/80 leading-relaxed mb-4">
-              We respect the forest. Every piece of wood we use is traced back to sustainably managed forests 
-              where harvesting is carefully planned to ensure the ecosystem thrives.
+              Inspired by her interest in interior design, she purchased a container of furniture for her home. After renovating her house, the compliments from friends and relatives poured in, sparking the idea to start a small business selling exclusive teak furniture.
+            </p>
+            <p className="text-timber-darkwood/80 leading-relaxed mb-4">
+              In 2005, she launched a furniture showroom, Timber, on the first floor of her house in Rutland Gate 4th Street, with financial support from her husband. Within a few months, Viji was delighted to see her furniture selling rapidly.
             </p>
             <p className="text-timber-darkwood/80 leading-relaxed">
-              We focus on local woods like Walnut, Oak, and Ash, minimizing our carbon footprint while 
-              delivering unparalleled quality to your home.
+              Customers were impressed by the cost and finish, as there was no other place in Chennai offering such quality. Without any advertisements, the positive feedback from satisfied customers spread by word of mouth.
             </p>
+          </ScrollReveal>
+        </div>
+
+        {/* Section 3: Growth and Family */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+          <ScrollReveal direction="right">
+            <h2 className="font-serif text-4xl text-timber-darkwood mb-6">A Thriving Family Business</h2>
+            <p className="text-timber-darkwood/80 leading-relaxed mb-4">
+              As the business grew, she needed more investment and had to fully dedicate her time to Timber. She convinced her husband to help with logistics and diversified Timber into a comprehensive furniture showroom catering to all tastes.
+            </p>
+            <p className="text-timber-darkwood/80 leading-relaxed mb-4">
+              Timber now customizes furniture based on customer requirements, provides after-sales service for damage or customization (even years later), offers design advice for homes, restaurants and offices, and helps customers secure the best deals on bedding, fabric, marble, and glass as well.
+            </p>
+            <p className="text-timber-darkwood/80 leading-relaxed font-medium">
+              Today, it is a thriving family business with regular customers from all around India. Timber primarily sells teakwood furniture but also specializes in mahogany, solid wood, rattan and cane. Viji’s son, Abhinav, a practicing architect in Chennai manages the day-to-day operations.
+            </p>
+          </ScrollReveal>
+          <ScrollReveal direction="left" className="relative aspect-square md:aspect-[4/3]">
+            <Image
+              src="https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=2070&auto=format&fit=crop"
+              alt="Modern Timber Furniture"
+              fill
+              className="object-cover brightness-90"
+            />
           </ScrollReveal>
         </div>
       </section>
