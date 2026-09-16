@@ -1,7 +1,7 @@
 "use client";
 
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
-import { Mail, MapPin, Phone } from "lucide-react";
+import { Mail, MapPin, Phone, Globe, AtSign, Users } from "lucide-react";
 
 export default function ContactPage() {
   return (
@@ -25,9 +25,9 @@ export default function ContactPage() {
                 <div>
                   <h3 className="font-serif text-xl text-timber-darkwood mb-2">Showroom</h3>
                   <p className="text-timber-muted leading-relaxed">
-                    123 Craftsman Way<br />
-                    Portland, OR 97204<br />
-                    United States
+                    7/1, Basement, Kodambakkam High Road<br />
+                    Nungambakkam, Chennai - 600 034<br />
+                    Tamil Nadu, India
                   </p>
                 </div>
               </div>
@@ -41,8 +41,8 @@ export default function ContactPage() {
                 <div>
                   <h3 className="font-serif text-xl text-timber-darkwood mb-2">Phone</h3>
                   <p className="text-timber-muted leading-relaxed">
-                    +1 (555) 123-4567<br />
-                    Mon - Fri, 9am - 6pm PST
+                    Mr. Abhinav Saravanan<br />
+                    +91 99620 04055
                   </p>
                 </div>
               </div>
@@ -56,9 +56,30 @@ export default function ContactPage() {
                 <div>
                   <h3 className="font-serif text-xl text-timber-darkwood mb-2">Email</h3>
                   <p className="text-timber-muted leading-relaxed">
-                    hello@timberfurniture.com<br />
-                    support@timberfurniture.com
+                    <a href="mailto:viking@timberteak.com" className="hover:text-timber-teal transition-colors">viking@timberteak.com</a>
                   </p>
+                </div>
+              </div>
+            </ScrollReveal>
+
+            <ScrollReveal delay={0.4} direction="right">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-timber-teal text-white rounded-full flex items-center justify-center shrink-0">
+                  <Globe size={20} />
+                </div>
+                <div>
+                  <h3 className="font-serif text-xl text-timber-darkwood mb-2">Connect</h3>
+                  <div className="text-timber-muted leading-relaxed flex flex-col gap-2">
+                    <a href="https://www.timberteak.com" target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-timber-teal transition-colors">
+                      <Globe size={16} /> www.timberteak.com
+                    </a>
+                    <a href="https://instagram.com/timberteak" target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-timber-teal transition-colors">
+                      <AtSign size={16} /> @timberteak
+                    </a>
+                    <a href="https://facebook.com/timberteak" target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-timber-teal transition-colors">
+                      <Users size={16} /> /timberteak
+                    </a>
+                  </div>
                 </div>
               </div>
             </ScrollReveal>
