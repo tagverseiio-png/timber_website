@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Search, ShoppingBag, Menu, X, Heart } from "lucide-react";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -35,8 +36,15 @@ export function Navbar() {
     >
       <div className="container mx-auto px-6 md:px-12 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="font-serif text-2xl tracking-wide text-timber-darkwood font-bold">
-          TIMBER.
+        <Link href="/" className="flex items-center">
+          <Image 
+            src="/images/logo-transparent.png" 
+            alt="Timber Logo" 
+            width={140} 
+            height={50} 
+            className="object-contain" 
+            priority
+          />
         </Link>
 
         {/* Desktop Navigation */}
