@@ -17,6 +17,60 @@ function useIsMobile() {
   return isMobile;
 }
 
+function ParallaxImage({ img, i, phase, smoothMouseX, smoothMouseY, setIsHoveringImage }: any) {
+  const initX = typeof img.initialPos.x === "string" ? parseFloat(img.initialPos.x) : img.initialPos.x;
+  const exitX = initX < 0 ? "-150vw" : "150vw";
+  
+  const x = useTransform(smoothMouseX, [-1, 1], [`calc(${img.initialPos.x} + ${-20 * img.depth}px)`, `calc(${img.initialPos.x} + ${20 * img.depth}px)`]);
+  const y = useTransform(smoothMouseY, [-1, 1], [`calc(${img.initialPos.y} + ${-20 * img.depth}px)`, `calc(${img.initialPos.y} + ${20 * img.depth}px)`]);
+
+  return (
+    <motion.div
+      initial={{ 
+        opacity: 0, 
+        x: img.initialPos.x, 
+        y: img.initialPos.y, 
+        scale: 0.8,
+        rotate: 0 
+      }}
+      animate={phase === "images" ? { 
+        opacity: 1, 
+        scale: img.initialPos.scale,
+        rotate: img.initialPos.rotate
+      } : phase === "exit" ? {
+        opacity: 0,
+        x: exitX,
+        scale: img.initialPos.scale * 1.5,
+        rotate: img.initialPos.rotate * 2
+      } : {}}
+      transition={{
+        duration: phase === "exit" ? 1.5 : 1.2,
+        ease: [0.25, 0.1, 0.25, 1],
+        delay: phase === "images" ? i * 0.15 : 0
+      }}
+      style={{
+        x,
+        y,
+        zIndex: Math.round(img.depth * 10)
+      }}
+      className="absolute shadow-2xl rounded-sm overflow-hidden"
+      onMouseEnter={() => setIsHoveringImage(true)}
+      onMouseLeave={() => setIsHoveringImage(false)}
+    >
+      <div className="relative w-[300px] h-[400px] md:w-[400px] md:h-[500px]">
+        <Image
+          src={img.src}
+          alt={img.alt}
+          fill
+          className="object-cover"
+          sizes="(max-width: 768px) 300px, 400px"
+          priority
+        />
+      </div>
+    </motion.div>
+  );
+}
+
 export function CinematicIntro() {
   const [phase, setPhase] = useState<"logo" | "images" | "exit">("logo");
   const [isHoveringImage, setIsHoveringImage] = useState(false);
@@ -26,10 +80,8 @@ export function CinematicIntro() {
 
   useEffect(() => {
     const hasSeen = sessionStorage.getItem("hasSeenCinematicIntro");
-    // const hasSeen = false; // uncomment for testing
     if (hasSeen) {
       setShouldRender(false);
-      // Dispatch immediately in case other components are listening
       window.dispatchEvent(new Event("introComplete"));
     } else {
       setShouldRender(true);
@@ -37,19 +89,19 @@ export function CinematicIntro() {
     }
   }, []);
 
-  // Mouse tracking for parallax and custom cursor
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
   const smoothMouseX = useSpring(mouseX, { damping: 30, stiffness: 100, mass: 1 });
   const smoothMouseY = useSpring(mouseY, { damping: 30, stiffness: 100, mass: 1 });
 
-  // Custom Cursor Spring
   const cursorX = useSpring(mouseX, { damping: 25, stiffness: 200, mass: 0.5 });
   const cursorY = useSpring(mouseY, { damping: 25, stiffness: 200, mass: 0.5 });
 
+  const cursorStyleX = useTransform(cursorX, [-1, 1], [0, typeof window !== "undefined" ? window.innerWidth : 0]);
+  const cursorStyleY = useTransform(cursorY, [-1, 1], [0, typeof window !== "undefined" ? window.innerHeight : 0]);
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      // Normalize mouse coordinates from -1 to 1 based on window center
       const x = (e.clientX / window.innerWidth) * 2 - 1;
       const y = (e.clientY / window.innerHeight) * 2 - 1;
       mouseX.set(x);
@@ -61,18 +113,14 @@ export function CinematicIntro() {
   }, [mouseX, mouseY]);
 
   useEffect(() => {
-    // Phase Timeline
     let timer1: NodeJS.Timeout;
     let timer2: NodeJS.Timeout;
 
     if (phase === "logo") {
-      // Logo fades out after 1.5s
       timer1 = setTimeout(() => setPhase("images"), 1500);
     } else if (phase === "images") {
-      // Images sit for 2.5s before auto exiting
       timer2 = setTimeout(() => setPhase("exit"), 2500);
     } else if (phase === "exit") {
-      // Wait for exit animation to finish before notifying parent
       const timer3 = setTimeout(() => {
         window.dispatchEvent(new Event("introComplete"));
         setShouldRender(false);
@@ -87,7 +135,6 @@ export function CinematicIntro() {
   }, [phase]);
 
   useEffect(() => {
-    // Allow wheel/scroll or touchmove to immediately trigger the exit phase
     const handleScroll = (e: Event) => {
       if (phase === "images") {
         setPhase("exit");
@@ -104,7 +151,6 @@ export function CinematicIntro() {
   }, [phase]);
 
   if (shouldRender === false) return null;
-  // If still checking session storage (avoid hydration mismatch), render nothing or a loading state
   if (shouldRender === null) return (
     <div className="fixed inset-0 z-[200] bg-timber-beige" /> 
   );
@@ -117,17 +163,15 @@ export function CinematicIntro() {
       transition={{ duration: 1.5, ease: "easeInOut", delay: 0.5 }}
       className="fixed inset-0 z-[200] flex items-center justify-center bg-timber-beige overflow-hidden pointer-events-auto"
       style={{
-        // Disable pointer events when exiting so clicks fall through to the Hero
         pointerEvents: phase === "exit" ? "none" : "auto"
       }}
     >
-      {/* Custom Cursor (Desktop only) */}
       {!isMobile && phase === "images" && (
         <motion.div
           className="fixed left-0 top-0 pointer-events-none z-[300] flex items-center justify-center mix-blend-difference"
           style={{ 
-            x: useTransform(cursorX, [-1, 1], [0, typeof window !== "undefined" ? window.innerWidth : 0]),
-            y: useTransform(cursorY, [-1, 1], [0, typeof window !== "undefined" ? window.innerHeight : 0]),
+            x: cursorStyleX,
+            y: cursorStyleY,
             translateX: "-50%",
             translateY: "-50%"
           }}
@@ -167,60 +211,17 @@ export function CinematicIntro() {
       </AnimatePresence>
 
       <div className="relative w-full h-full flex items-center justify-center">
-        {introImages.map((img, i) => {
-          // Parse initial pos
-          const initX = typeof img.initialPos.x === "string" ? parseFloat(img.initialPos.x) : img.initialPos.x;
-          // Determine if it should exit left or right based on initial position
-          const exitX = initX < 0 ? "-150vw" : "150vw";
-          
-          return (
-            <motion.div
-              key={img.id}
-              initial={{ 
-                opacity: 0, 
-                x: img.initialPos.x, 
-                y: img.initialPos.y, 
-                scale: 0.8,
-                rotate: 0 
-              }}
-              animate={phase === "images" ? { 
-                opacity: 1, 
-                scale: img.initialPos.scale,
-                rotate: img.initialPos.rotate
-              } : phase === "exit" ? {
-                opacity: 0,
-                x: exitX,
-                scale: img.initialPos.scale * 1.5, // Scale up slightly as it moves out
-                rotate: img.initialPos.rotate * 2
-              } : {}}
-              transition={{
-                duration: phase === "exit" ? 1.5 : 1.2,
-                ease: [0.25, 0.1, 0.25, 1], // cinematic smooth ease
-                delay: phase === "images" ? i * 0.15 : 0 // stagger in, exit simultaneously
-              }}
-              style={{
-                // Parallax Effect
-                x: useTransform(smoothMouseX, [-1, 1], [`calc(${img.initialPos.x} + ${-20 * img.depth}px)`, `calc(${img.initialPos.x} + ${20 * img.depth}px)`]),
-                y: useTransform(smoothMouseY, [-1, 1], [`calc(${img.initialPos.y} + ${-20 * img.depth}px)`, `calc(${img.initialPos.y} + ${20 * img.depth}px)`]),
-                zIndex: Math.round(img.depth * 10)
-              }}
-              className="absolute shadow-2xl rounded-sm overflow-hidden"
-              onMouseEnter={() => setIsHoveringImage(true)}
-              onMouseLeave={() => setIsHoveringImage(false)}
-            >
-              <div className="relative w-[300px] h-[400px] md:w-[400px] md:h-[500px]">
-                <Image
-                  src={img.src}
-                  alt={img.alt}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 300px, 400px"
-                  priority
-                />
-              </div>
-            </motion.div>
-          );
-        })}
+        {introImages.map((img, i) => (
+          <ParallaxImage 
+            key={img.id} 
+            img={img} 
+            i={i} 
+            phase={phase} 
+            smoothMouseX={smoothMouseX} 
+            smoothMouseY={smoothMouseY} 
+            setIsHoveringImage={setIsHoveringImage} 
+          />
+        ))}
       </div>
     </motion.div>
   );

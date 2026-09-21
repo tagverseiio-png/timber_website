@@ -57,6 +57,12 @@ export function HeroSection() {
   const textY = useTransform(smoothMouseY, [-0.5, 0.5], [-5, 5]);
   const grainX = useTransform(smoothMouseX, [-0.5, 0.5], [-15, 15]);
 
+  const lightingBackground = useTransform(
+    [smoothMouseX, smoothMouseY],
+    ([x, y]) =>
+      `radial-gradient(circle at ${(x as number + 0.5) * 100}% ${(y as number + 0.5) * 100}%, rgba(245, 240, 230, 0.3) 0%, transparent 50%)`
+  );
+
   const handleMouseMove = (e: MouseEvent) => {
     if (shouldReduceMotion || !containerRef.current) return;
     const { left, top, width, height } = containerRef.current.getBoundingClientRect();
@@ -192,11 +198,7 @@ export function HeroSection() {
           <motion.div
             className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30"
             style={{
-              background: useTransform(
-                [smoothMouseX, smoothMouseY],
-                ([x, y]) =>
-                  `radial-gradient(circle at ${(x as number + 0.5) * 100}% ${(y as number + 0.5) * 100}%, rgba(245, 240, 230, 0.3) 0%, transparent 50%)`
-              ),
+              background: lightingBackground,
             }}
           />
         )}

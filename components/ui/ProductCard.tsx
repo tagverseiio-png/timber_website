@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Heart, ShoppingBag, Eye } from "lucide-react";
@@ -24,6 +24,11 @@ interface ProductCardProps {
 
 export function ProductCard({ product }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   return (
     <div 
@@ -99,15 +104,17 @@ export function ProductCard({ product }: ProductCardProps) {
             viewBox="0 0 100 10" 
             preserveAspectRatio="none"
           >
-            <motion.path 
-              d="M0,5 Q20,8 40,3 T80,7 T100,5" 
-              strokeWidth="2" 
-              fill="none" 
-              strokeLinecap="round"
-              initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: isHovered ? 1 : 0, opacity: isHovered ? 1 : 0 }}
-              transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            />
+            {isMounted && (
+              <motion.path 
+                d="M0,5 Q20,8 40,3 T80,7 T100,5" 
+                strokeWidth="2" 
+                fill="none" 
+                strokeLinecap="round"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: isHovered ? 1 : 0, opacity: isHovered ? 1 : 0 }}
+                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+              />
+            )}
           </svg>
         </div>
         <Link href={`/shop/${product.id}`} className="font-serif text-lg text-timber-darkwood hover:text-timber-teal transition-colors mb-1">

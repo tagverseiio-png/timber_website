@@ -37,6 +37,11 @@ export function TimberGrainEffect({ children, className = "" }: TimberGrainEffec
     mouseY.set(0);
   };
 
+  const lightingBackground = useTransform(
+    [mouseX, mouseY],
+    ([x, y]) => `radial-gradient(circle at ${(x as number + 0.5) * 100}% ${(y as number + 0.5) * 100}%, rgba(255,255,255,0.4) 0%, transparent 60%)`
+  );
+
   return (
     <div 
       ref={ref}
@@ -60,10 +65,7 @@ export function TimberGrainEffect({ children, className = "" }: TimberGrainEffec
         <motion.div
           className="absolute inset-0 z-10 pointer-events-none opacity-30 mix-blend-overlay"
           style={{
-            background: useTransform(
-              [mouseX, mouseY],
-              ([x, y]) => `radial-gradient(circle at ${(x as number + 0.5) * 100}% ${(y as number + 0.5) * 100}%, rgba(255,255,255,0.4) 0%, transparent 60%)`
-            )
+            background: lightingBackground
           }}
         />
 
