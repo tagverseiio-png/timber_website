@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 
 interface ScrollRevealProps {
   children: ReactNode;
@@ -18,6 +18,16 @@ export function ScrollReveal({
   direction = "up",
   duration = 0.8,
 }: ScrollRevealProps) {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return <div className={className}>{children}</div>;
+  }
+
   const getVariants = () => {
     switch (direction) {
       case "up":
