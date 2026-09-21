@@ -1,48 +1,47 @@
 "use client";
 
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
-import { Mail, MapPin, Phone, Globe, AtSign, Users } from "lucide-react";
+import { Mail, MapPin, Phone, Clock } from "lucide-react";
 
 export default function ContactPage() {
   return (
     <div className="bg-timber-beige min-h-screen pt-24 pb-32">
       <div className="container mx-auto px-6 md:px-12">
-        <ScrollReveal className="text-center mb-16">
-          <h1 className="font-serif text-4xl md:text-5xl text-timber-darkwood mb-4">Get in Touch</h1>
-          <p className="text-timber-muted max-w-2xl mx-auto">
-            Whether you have a question about our collections or want to discuss a custom piece, our team is here to help.
-          </p>
+        <ScrollReveal className="text-center mb-12">
+          <h1 className="font-serif text-4xl md:text-5xl text-timber-darkwood mb-4">Contact</h1>
         </ScrollReveal>
 
-        <div className="flex flex-col lg:flex-row gap-16">
-          {/* Contact Info */}
-          <div className="lg:w-1/3 flex flex-col gap-10">
-            <ScrollReveal delay={0.1} direction="right">
+        {/* Map */}
+        <ScrollReveal delay={0.1} className="mb-16">
+          <div className="w-full h-[400px] md:h-[480px] overflow-hidden rounded-sm shadow-sm">
+            <iframe
+              title="Timber House of Exclusive Location"
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d248768.70358116963!2d80.0149666524906!3d13.034971763297335!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a52666a0c771f05%3A0x2f7a673ddd8032e2!2sTimber%20House%20Of%20Exclusive!5e0!3m2!1sen!2sca!4v1753383335648!5m2!1sen!2sca"
+              width="100%"
+              height="100%"
+              style={{ border: 0 }}
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          </div>
+        </ScrollReveal>
+
+        {/* Address / Timings / Get In Touch */}
+        <div className="flex flex-col lg:flex-row gap-16 justify-between">
+          {/* Left: Address + Timings */}
+          <div className="lg:w-1/2 flex flex-col gap-10">
+            <ScrollReveal delay={0.2} direction="right">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-timber-teal text-white rounded-full flex items-center justify-center shrink-0">
                   <MapPin size={20} />
                 </div>
                 <div>
-                  <h3 className="font-serif text-xl text-timber-darkwood mb-2">Showroom</h3>
+                  <h3 className="font-serif text-xl text-timber-darkwood mb-2">Address</h3>
                   <p className="text-timber-muted leading-relaxed">
-                    7/1, Basement, Kodambakkam High Road<br />
-                    Nungambakkam, Chennai - 600 034<br />
-                    Tamil Nadu, India
-                  </p>
-                </div>
-              </div>
-            </ScrollReveal>
-            
-            <ScrollReveal delay={0.2} direction="right">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-timber-teal text-white rounded-full flex items-center justify-center shrink-0">
-                  <Phone size={20} />
-                </div>
-                <div>
-                  <h3 className="font-serif text-xl text-timber-darkwood mb-2">Phone</h3>
-                  <p className="text-timber-muted leading-relaxed">
-                    Mr. Abhinav Saravanan<br />
-                    +91 99620 04055
+                    7/1, Basement, Timber House of Exclusive, Kodambakkam High Rd<br />
+                    below Kumarakom the Restaurant, Tirumurthy Nagar<br />
+                    Nungambakkam, Chennai, Tamil Nadu 600034, India
                   </p>
                 </div>
               </div>
@@ -51,69 +50,52 @@ export default function ContactPage() {
             <ScrollReveal delay={0.3} direction="right">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-timber-teal text-white rounded-full flex items-center justify-center shrink-0">
-                  <Mail size={20} />
+                  <Clock size={20} />
                 </div>
                 <div>
-                  <h3 className="font-serif text-xl text-timber-darkwood mb-2">Email</h3>
+                  <h3 className="font-serif text-xl text-timber-darkwood mb-2">Timings</h3>
                   <p className="text-timber-muted leading-relaxed">
-                    <a href="mailto:viking@timberteak.com" className="hover:text-timber-teal transition-colors">viking@timberteak.com</a>
+                    Monday–Saturday: 10 AM to 8:30 PM<br />
+                    Sunday: 10:30 AM to 6 PM<br />
+                    Please call before visiting on public holidays.
                   </p>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal delay={0.4} direction="right">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-timber-teal text-white rounded-full flex items-center justify-center shrink-0">
-                  <Globe size={20} />
-                </div>
-                <div>
-                  <h3 className="font-serif text-xl text-timber-darkwood mb-2">Connect</h3>
-                  <div className="text-timber-muted leading-relaxed flex flex-col gap-2">
-                    <a href="https://www.timberteak.com" target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-timber-teal transition-colors">
-                      <Globe size={16} /> www.timberteak.com
-                    </a>
-                    <a href="https://instagram.com/timberteak" target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-timber-teal transition-colors">
-                      <AtSign size={16} /> @timberteak
-                    </a>
-                    <a href="https://facebook.com/timberteak" target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-timber-teal transition-colors">
-                      <Users size={16} /> /timberteak
-                    </a>
-                  </div>
                 </div>
               </div>
             </ScrollReveal>
           </div>
 
-          {/* Contact Form */}
-          <div className="lg:w-2/3 bg-white p-8 md:p-12 shadow-sm rounded-sm">
+          {/* Right: Get In Touch */}
+          <div className="lg:w-1/2 flex flex-col gap-10">
             <ScrollReveal delay={0.2} direction="left">
-              <form className="flex flex-col gap-6" onSubmit={(e) => e.preventDefault()}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-timber-darkwood">First Name</label>
-                    <input type="text" className="border border-timber-darkwood/20 p-3 outline-none focus:border-timber-teal transition-colors" required />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-timber-darkwood">Last Name</label>
-                    <input type="text" className="border border-timber-darkwood/20 p-3 outline-none focus:border-timber-teal transition-colors" required />
-                  </div>
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-timber-teal text-white rounded-full flex items-center justify-center shrink-0">
+                  <Phone size={20} />
                 </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-timber-darkwood">Email Address</label>
-                  <input type="email" className="border border-timber-darkwood/20 p-3 outline-none focus:border-timber-teal transition-colors" required />
+                <div>
+                  <h3 className="font-serif text-xl text-timber-darkwood mb-2">Get In Touch</h3>
+                  <p className="text-timber-muted leading-relaxed">
+                    Telephone: 044 2833 0440<br />
+                    Mobile: +91 99620 04546
+                  </p>
                 </div>
+              </div>
+            </ScrollReveal>
 
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-timber-darkwood">Message</label>
-                  <textarea rows={5} className="border border-timber-darkwood/20 p-3 outline-none focus:border-timber-teal transition-colors resize-none" required></textarea>
+            <ScrollReveal delay={0.3} direction="left">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-timber-teal text-white rounded-full flex items-center justify-center shrink-0">
+                  <Mail size={20} />
                 </div>
-
-                <button className="bg-timber-darkwood text-timber-beige py-4 uppercase tracking-widest text-sm font-medium hover:bg-timber-teal transition-colors interactive mt-2">
-                  Send Message
-                </button>
-              </form>
+                <div>
+                  <h3 className="font-serif text-xl text-timber-darkwood mb-2">Email</h3>
+                  <p className="text-timber-muted leading-relaxed">
+                    <a href="mailto:viking@timberteak.com" className="hover:text-timber-teal transition-colors">
+                      viking@timberteak.com
+                    </a>
+                  </p>
+                  <p className="text-timber-muted mt-2 font-medium">Parking Available</p>
+                </div>
+              </div>
             </ScrollReveal>
           </div>
         </div>
