@@ -8,47 +8,28 @@ export default function AboutPage() {
   return (
     <div className="bg-timber-beige min-h-screen">
       {/* Hero */}
-      <section className="relative h-[60vh] flex items-center justify-center -mt-24 pt-24 overflow-hidden group">
-        <motion.div 
-          className="absolute inset-0 w-full h-full"
-          initial={{ scale: 1.1, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 1.5, ease: "easeOut" }}
-        >
-          <motion.div
-            className="absolute inset-0 w-full h-full"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 2, ease: "easeOut" }}
-          >
+      <section className="w-full bg-timber-beige py-16 md:py-24 px-4">
+        <div className="max-w-5xl mx-auto relative rounded-md shadow-xl bg-white p-2 md:p-3 border border-timber-darkwood/5">
+          <div className="relative w-full aspect-[4/3] md:aspect-[16/9] overflow-hidden rounded-sm">
             <Image
               src="/images/about-first-image.jpeg"
-              alt=""
+              alt="Timber dining room set styled with teakwood furniture"
               fill
-              className="object-cover blur-2xl opacity-50 scale-110"
+              className="object-cover"
               priority
             />
-          </motion.div>
-          <motion.div
-            className="w-full h-full relative z-10"
-            whileHover={{ scale: 1.05 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-          >
-            <Image
-              src="/images/about-first-image.jpeg"
-              alt="Craftsmanship"
-              fill
-              className="object-contain brightness-[0.85] drop-shadow-2xl"
-              priority
-            />
-          </motion.div>
-        </motion.div>
-        <div className="relative z-10 text-center pointer-events-none mt-10">
-          <ScrollReveal>
-            <h1 className="font-serif text-5xl md:text-7xl text-timber-darkwood bg-timber-beige/80 px-8 py-4 rounded-xl backdrop-blur-md mb-4 shadow-lg border border-timber-darkwood/10 inline-block">Our Story</h1>
-            <br/>
-            <p className="text-timber-darkwood font-medium text-lg uppercase tracking-widest bg-timber-beige/80 px-6 py-2 rounded-lg backdrop-blur-md inline-block shadow-sm border border-timber-darkwood/10 mt-2">Rooted in Nature</p>
-          </ScrollReveal>
+            {/* Text Overlay */}
+            <div className="absolute inset-0 flex items-center justify-center p-4">
+              <ScrollReveal>
+                <div className="bg-timber-beige/85 backdrop-blur-sm px-8 py-8 md:px-12 md:py-10 rounded-xl flex flex-col items-center justify-center border border-timber-darkwood/10 shadow-lg text-center">
+                  <h1 className="font-serif text-3xl md:text-6xl text-timber-darkwood m-0">Our Story</h1>
+                  <span className="mt-4 text-timber-darkwood font-medium text-sm uppercase tracking-widest">
+                    Rooted in Nature
+                  </span>
+                </div>
+              </ScrollReveal>
+            </div>
+          </div>
         </div>
       </section>
 
