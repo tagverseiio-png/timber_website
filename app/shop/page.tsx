@@ -62,10 +62,115 @@ const ALL_PRODUCTS: Product[] = [
     image: "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?q=80&w=1000&auto=format&fit=crop",
     rating: 5.0,
     category: "tables"
-  }
+  },
+  ...[
+    "4630828655134806892_IMG_2887.jpg",
+    "7527029664_IMG_5598.jpg",
+    "7583922320_IMG_2208.jpg",
+    "IMG_0102.jpg",
+    "IMG_0782.jpg",
+    "IMG_1061.jpg",
+    "IMG_1160.jpg",
+    "IMG_1626.jpg",
+    "IMG_1774.jpg",
+    "IMG_2516.JPG",
+    "IMG_3129.jpg",
+    "IMG_4417.jpg",
+    "IMG_5166.jpg",
+    "IMG_5315.jpg",
+    "IMG_5971.jpg",
+    "IMG_6566.jpg",
+    "IMG_6969.jpg",
+    "IMG_8718.jpg",
+    "IMG_8746.jpg"
+  ].map((img, i, arr) => ({
+    id: `2seater-${i}`,
+    name: `2 Seaters ${i + 1}`,
+    price: 1500 + i * 20,
+    woodType: "Premium Timber",
+    image: `/images/2%20SEATERS/${img}`,
+    hoverImage: `/images/2%20SEATERS/${arr[(i + 1) % arr.length]}`,
+    rating: 4.8,
+    category: "2 seaters"
+  })),
+  ...[
+    "10765100800_IMG_7990.jpg",
+    "FullSizeRend3.jpg",
+    "IMG_1266.jpg",
+    "IMG_2737.jpg",
+    "IMG_5158.jpg",
+    "IMG_8552.jpg"
+  ].map((img, i, arr) => ({
+    id: `3seater-${i}`,
+    name: `3 Seaters ${i + 1}`,
+    price: 2500 + i * 50,
+    woodType: "Premium Timber",
+    image: `/images/3%20SEATERS/${img}`,
+    hoverImage: `/images/3%20SEATERS/${arr[(i + 1) % arr.length]}`,
+    rating: 4.9,
+    category: "3 seaters"
+  })),
+  ...[
+    "-1618728961451789600_IMG_0321.jpg",
+    "10749704016_IMG_7532.JPG",
+    "5200557774938736229_IMG_0330.jpg",
+    "FullSizeRend.jpg",
+    "IMG_5905.jpg",
+    "IMG_8549.jpg",
+    "IMG_8559.jpg",
+    "IMG_8957.jpg",
+    "IMG_9806.JPG",
+    "bar1.jpg"
+  ].map((img, i, arr) => ({
+    id: `bar-unit-${i}`,
+    name: `Bar Unit ${i + 1}`,
+    price: 3500 + i * 100,
+    woodType: "Premium Timber",
+    image: `/images/BAR%20UNITS/${img}`,
+    hoverImage: `/images/BAR%20UNITS/${arr[(i + 1) % arr.length]}`,
+    rating: 4.7,
+    category: "bar units"
+  })),
+  ...[
+    "10784526272_IMG_7433.jpg",
+    "IMG_4609.jpg",
+    "IMG_8061.jpg",
+    "IMG_8145.jpg",
+    "IMG_9170.jpg",
+    "book singke.jpg"
+  ].map((img, i, arr) => ({
+    id: `bookshelf-${i}`,
+    name: `Book Shelf ${i + 1}`,
+    price: 1200 + i * 50,
+    woodType: "Premium Timber",
+    image: `/images/BOOK%20SHELF/${img}`,
+    hoverImage: `/images/BOOK%20SHELF/${arr[(i + 1) % arr.length]}`,
+    rating: 4.8,
+    category: "book shelves"
+  })),
+  ...[
+    "IMG_0197.jpg",
+    "IMG_0665.jpg",
+    "IMG_4113.jpg",
+    "IMG_6621.jpg",
+    "IMG_6936.jpg",
+    "IMG_7073.jpg",
+    "IMG_7179.jpg",
+    "IMG_7817.jpg",
+    "IMG_8233.jpg"
+  ].map((img, i, arr) => ({
+    id: `buffet-${i}`,
+    name: `Buffet ${i + 1}`,
+    price: 2800 + i * 75,
+    woodType: "Premium Timber",
+    image: `/images/BUFFET/${img}`,
+    hoverImage: `/images/BUFFET/${arr[(i + 1) % arr.length]}`,
+    rating: 4.9,
+    category: "buffets"
+  }))
 ];
 
-const CATEGORIES = ["All", "Tables", "Chairs", "Beds", "Cabinets"];
+const CATEGORIES = ["All", "Tables", "Chairs", "Beds", "Cabinets", "2 Seaters", "3 Seaters", "Bar Units", "Book Shelves", "Buffets"];
 
 export default function ShopPage() {
   const [activeCategory, setActiveCategory] = useState("All");

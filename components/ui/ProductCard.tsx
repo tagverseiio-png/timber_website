@@ -43,18 +43,9 @@ export function ProductCard({ product }: ProductCardProps) {
             src={product.image}
             alt={product.name}
             fill
-            className={`object-cover transition-all duration-[800ms] ease-[var(--ease-organic)] ${isHovered ? "scale-105" : "scale-100"} ${isHovered && product.hoverImage ? "opacity-0" : "opacity-100"}`}
+            className={`object-contain p-4 transition-all duration-[800ms] ease-[var(--ease-organic)] ${isHovered ? "scale-110" : "scale-100"}`}
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
-          {product.hoverImage && (
-            <Image
-              src={product.hoverImage}
-              alt={`${product.name} alternate view`}
-              fill
-              className={`object-cover transition-all duration-[800ms] ease-[var(--ease-organic)] ${isHovered ? "opacity-100 scale-105" : "opacity-0 scale-100"}`}
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            />
-          )}
 
           {/* Grain Texture Overlay */}
           <div className={`absolute inset-0 z-10 pointer-events-none mix-blend-multiply transition-opacity duration-700 ease-in-out ${isHovered ? "opacity-15" : "opacity-0"}`}>
