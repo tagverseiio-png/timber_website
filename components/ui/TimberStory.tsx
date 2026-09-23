@@ -60,7 +60,7 @@ export function TimberStory() {
           className="absolute inset-0 z-10"
         >
           <Image
-            src="/images/media_1789477358584.jpg"
+            src="/images/art_of_craft.png"
             alt="Carving wood"
             fill
             className="object-cover brightness-50"
