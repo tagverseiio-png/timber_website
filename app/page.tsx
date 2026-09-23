@@ -24,7 +24,7 @@ const featuredProducts = [
     name: "Classic Timber Bedframe",
     price: 1850,
     woodType: "Mahogany",
-    image: "/images/media_1789478288354.png",
+    image: "/images/book_self.jpg",
     rating: 4.8,
     category: "Beds"
   },
