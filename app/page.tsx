@@ -66,7 +66,7 @@ export default function Home() {
           <ScrollReveal>
             <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/50 border border-timber-beige/10">
               <BeforeAfterSlider 
-                beforeImage="/images/media_1789477358584.jpg"
+                beforeImage="/images/left_side%20_image.png"
                 afterImage="/images/media_1789476566304.jpg"
               />
             </div>
