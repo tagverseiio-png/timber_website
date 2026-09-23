@@ -73,7 +73,7 @@ export function TimberStory() {
           className="absolute inset-0 z-20"
         >
           <Image
-            src="/images/media_1789478474046.png"
+            src="/images/refine%20forlife.JPG"
             alt="Finished Furniture"
             fill
             className="object-cover brightness-[0.4]"
