@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { ProductCard, Product } from "@/components/ui/ProductCard";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { Filter, ChevronDown } from "lucide-react";
@@ -807,11 +808,24 @@ const ALL_PRODUCTS: Product[] = [
   }))
 ];
 
-const CATEGORIES = ["All", "2 Seaters", "3 Seaters", "Bar Units", "Book Shelves", "Buffets", "Chest Boxs", "Chest of Drawss", "Diwans", "Misc", "Outdoor", "Puja Units", "Shoe Racks", "Showcases", "Sofas", "Wardrobes", "Souvenirs", "Cots", "Chairs"];
+const CATEGORIES = ["All", "2 Seaters", "3 Seaters", "Bar Units", "Book Shelves", "Buffets", "Chest Boxes", "Chest of Draws", "Diwans", "Misc", "Outdoor", "Puja Units", "Shoe Racks", "Showcases", "Sofas", "Wardrobes", "Souvenirs", "Cots", "Chairs"];
 
-export default function ShopPage() {
+function ShopContent() {
+  const searchParams = useSearchParams();
+  const categoryParam = searchParams.get('category');
   const [activeCategory, setActiveCategory] = useState("All");
   const [sortBy, setSortBy] = useState("featured");
+
+  useEffect(() => {
+    if (categoryParam) {
+      const match = CATEGORIES.find(c => c.toLowerCase() === categoryParam.toLowerCase());
+      if (match) {
+        setActiveCategory(match);
+      } else {
+        setActiveCategory("All");
+      }
+    }
+  }, [categoryParam]);
 
   const filteredProducts = ALL_PRODUCTS.filter((product) => {
     if (activeCategory === "All") return true;
@@ -894,5 +908,13 @@ export default function ShopPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ShopPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-timber-beige flex items-center justify-center">Loading...</div>}>
+      <ShopContent />
+    </Suspense>
   );
 }
