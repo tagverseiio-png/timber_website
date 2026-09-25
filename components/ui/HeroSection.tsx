@@ -217,7 +217,7 @@ export function HeroSection() {
           variants={fadeVariants}
           className="text-timber-beige/80 uppercase tracking-[0.2em] text-xs md:text-sm font-semibold mb-6"
         >
-          Premium Timber Furniture
+          TIMBER TEST 123
         </motion.p>
 
         <motion.div variants={textContainerVariants} className="overflow-hidden mb-2 flex gap-4 flex-wrap justify-center lg:justify-start">
