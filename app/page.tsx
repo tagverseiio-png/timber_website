@@ -65,7 +65,7 @@ export default function Home() {
 
           <ScrollReveal>
             <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/50 border border-timber-beige/10">
-              <BeforeAfterSlider 
+              <BeforeAfterSlider
                 beforeImage="/images/left_side%20_image.png"
                 afterImage="/images/right_side_image.jpg"
               />
@@ -84,7 +84,7 @@ export default function Home() {
             <h2 className="text-sm tracking-[0.2em] uppercase font-semibold text-timber-teal mb-4">Featured Collection</h2>
             <h3 className="font-serif text-4xl md:text-5xl">Handcrafted Excellence</h3>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12">
             {featuredProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
