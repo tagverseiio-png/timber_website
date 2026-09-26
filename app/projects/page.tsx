@@ -29,10 +29,10 @@ const PROJECTS = [
   },
   {
     id: 4,
-    title: "The Artisan Armchair",
+    title: "The Modern 2-Seater",
     type: "Seating",
-    description: "A luxurious tufted leather and solid wood armchair, bringing classic elegance to any space.",
-    image: "/images/chair.jpg",
+    description: "A stylish and comfortable two-seater sofa, crafted with premium timber and plush upholstery for cozy spaces.",
+    image: "/images/2%20seater.jpg",
   },
   {
     id: 5,
