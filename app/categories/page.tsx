@@ -21,7 +21,7 @@ const CATEGORIES = [
   { name: "Sofas", image: "/images/sofa.JPG", link: "/shop?category=Sofas" },
   { name: "Wardrobes", image: "https://images.unsplash.com/photo-1558997519-83ea9252edf8?q=80&w=1500&auto=format&fit=crop", link: "/shop?category=Wardrobes" },
   { name: "Souvenirs", image: "/images/souvenier.jpg", link: "/shop?category=Souvenirs" },
-  { name: "Wallmounts and Mirrors", image: "/images/wallmounts%20and%20mirror.jpg", link: "/shop?category=Wallmounts and Mirrors" },
+  { name: "Wallmounts and Mirrors", image: "/images/mirror.jpg", link: "/shop?category=Wallmounts and Mirrors" },
   { name: "Cots", image: "/images/cots.jpg", link: "/shop?category=Cots" },
   { name: "Chairs", image: "/images/chair.jpg", link: "/shop?category=Chairs" },
 ];

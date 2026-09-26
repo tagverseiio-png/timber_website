@@ -15,7 +15,7 @@ const featuredProducts = [
     name: "The Artisan Dining Table",
     price: 2400,
     woodType: "Solid Oak",
-    image: "/images/media_1789476566304.jpg",
+    image: "/images/media_1789477358584.jpg",
     rating: 5,
     category: "Tables"
   },
