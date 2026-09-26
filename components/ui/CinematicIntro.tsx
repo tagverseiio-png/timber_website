@@ -199,7 +199,7 @@ export function CinematicIntro() {
           >
             <div className="relative w-64 md:w-96 aspect-[3/1]">
               <Image 
-                src="/images/logo.png" 
+                src="/images/logo-transparent.png" 
                 alt="Timber Logo" 
                 fill 
                 className="object-contain drop-shadow-2xl"
