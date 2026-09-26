@@ -20,21 +20,21 @@ function useIsMobile() {
 function ParallaxImage({ img, i, phase, smoothMouseX, smoothMouseY, setIsHoveringImage }: any) {
   const initX = typeof img.initialPos.x === "string" ? parseFloat(img.initialPos.x) : img.initialPos.x;
   const exitX = initX < 0 ? "-150vw" : "150vw";
-  
+
   const x = useTransform(smoothMouseX, [-1, 1], [`calc(${img.initialPos.x} + ${-20 * img.depth}px)`, `calc(${img.initialPos.x} + ${20 * img.depth}px)`]);
   const y = useTransform(smoothMouseY, [-1, 1], [`calc(${img.initialPos.y} + ${-20 * img.depth}px)`, `calc(${img.initialPos.y} + ${20 * img.depth}px)`]);
 
   return (
     <motion.div
-      initial={{ 
-        opacity: 0, 
-        x: img.initialPos.x, 
-        y: img.initialPos.y, 
+      initial={{
+        opacity: 0,
+        x: img.initialPos.x,
+        y: img.initialPos.y,
         scale: 0.8,
-        rotate: 0 
+        rotate: 0
       }}
-      animate={phase === "images" ? { 
-        opacity: 1, 
+      animate={phase === "images" ? {
+        opacity: 1,
         scale: img.initialPos.scale,
         rotate: img.initialPos.rotate
       } : phase === "exit" ? {
@@ -140,10 +140,10 @@ export function CinematicIntro() {
         setPhase("exit");
       }
     };
-    
+
     window.addEventListener("wheel", handleScroll, { passive: true });
     window.addEventListener("touchmove", handleScroll, { passive: true });
-    
+
     return () => {
       window.removeEventListener("wheel", handleScroll);
       window.removeEventListener("touchmove", handleScroll);
@@ -152,7 +152,7 @@ export function CinematicIntro() {
 
   if (shouldRender === false) return null;
   if (shouldRender === null) return (
-    <div className="fixed inset-0 z-[200] bg-timber-beige" /> 
+    <div className="fixed inset-0 z-[200] bg-timber-beige" />
   );
 
   return (
@@ -169,7 +169,7 @@ export function CinematicIntro() {
       {!isMobile && phase === "images" && (
         <motion.div
           className="fixed left-0 top-0 pointer-events-none z-[300] flex items-center justify-center mix-blend-difference"
-          style={{ 
+          style={{
             x: cursorStyleX,
             y: cursorStyleY,
             translateX: "-50%",
@@ -198,10 +198,10 @@ export function CinematicIntro() {
             className="absolute z-50 flex items-center justify-center"
           >
             <div className="relative w-64 md:w-96 aspect-[3/1]">
-              <Image 
-                src="/images/logo-transparent.png" 
-                alt="Timber Logo" 
-                fill 
+              <Image
+                src="/images/logo-transparent.png"
+                alt="Timber Logo"
+                fill
                 className="object-contain drop-shadow-2xl"
                 priority
               />
@@ -212,14 +212,14 @@ export function CinematicIntro() {
 
       <div className="relative w-full h-full flex items-center justify-center">
         {introImages.map((img, i) => (
-          <ParallaxImage 
-            key={img.id} 
-            img={img} 
-            i={i} 
-            phase={phase} 
-            smoothMouseX={smoothMouseX} 
-            smoothMouseY={smoothMouseY} 
-            setIsHoveringImage={setIsHoveringImage} 
+          <ParallaxImage
+            key={img.id}
+            img={img}
+            i={i}
+            phase={phase}
+            smoothMouseX={smoothMouseX}
+            smoothMouseY={smoothMouseY}
+            setIsHoveringImage={setIsHoveringImage}
           />
         ))}
       </div>
