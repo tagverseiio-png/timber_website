@@ -29,9 +29,9 @@ const PROJECTS = [
   },
   {
     id: 4,
-    title: "The Artisan Chair",
+    title: "The Artisan Armchair",
     type: "Seating",
-    description: "Ergonomically designed solid wood chairs that blend seamlessly into modern dining rooms.",
+    description: "A luxurious tufted leather and solid wood armchair, bringing classic elegance to any space.",
     image: "/images/chair.jpg",
   },
   {
