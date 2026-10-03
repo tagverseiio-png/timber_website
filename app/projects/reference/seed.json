@@ -1,0 +1,52 @@
+[
+  {
+    "id": 1,
+    "title": "The Grand Sofa Collection",
+    "type": "Living Room",
+    "category": "sofa",
+    "description": "A masterful centerpiece for any living space, combining rich timber grains with ultimate comfort and structural integrity.",
+    "price": 1299.99,
+    "image": "/images/sofa.JPG",
+    "orderIndex": 1
+  },
+  {
+    "id": 2,
+    "title": "Coastal Retreat Bed",
+    "type": "Bedroom",
+    "category": "bed",
+    "description": "A solid timber bedframe crafted for restful nights and timeless aesthetics.",
+    "price": 899.99,
+    "image": "/images/cots.jpg",
+    "orderIndex": 2
+  },
+  {
+    "id": 3,
+    "title": "The Executive Bar",
+    "type": "Entertainment",
+    "category": "showcase",
+    "description": "An elegant home bar unit featuring premium wood finishes and smart storage solutions.",
+    "price": 1599.99,
+    "image": "/images/bar_unit.jpg",
+    "orderIndex": 3
+  },
+  {
+    "id": 4,
+    "title": "The Modern 2-Seater",
+    "type": "Seating",
+    "category": "sofa",
+    "description": "A stylish and comfortable two-seater sofa, crafted with premium timber and plush upholstery for cozy spaces.",
+    "price": 799.99,
+    "image": "/images/2%20seater.jpg",
+    "orderIndex": 4
+  },
+  {
+    "id": 5,
+    "title": "Urban Oasis Terrace",
+    "type": "Outdoor",
+    "category": "chair",
+    "description": "Weather-ready timber seating built to withstand the elements while bringing warmth to your garden.",
+    "price": 499.99,
+    "image": "/images/outdoor.jpg",
+    "orderIndex": 5
+  }
+]
