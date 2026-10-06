@@ -44,9 +44,9 @@ function ParallaxImage({ img, i, phase, smoothMouseX, smoothMouseY, setIsHoverin
         rotate: img.initialPos.rotate * 2
       } : {}}
       transition={{
-        duration: phase === "exit" ? 1.5 : 1.2,
+        duration: phase === "exit" ? 0.8 : 0.6,
         ease: [0.25, 0.1, 0.25, 1],
-        delay: phase === "images" ? i * 0.15 : 0
+        delay: phase === "images" ? i * 0.05 : 0
       }}
       style={{
         x,
@@ -117,14 +117,14 @@ export function CinematicIntro() {
     let timer2: NodeJS.Timeout;
 
     if (phase === "logo") {
-      timer1 = setTimeout(() => setPhase("images"), 1500);
+      timer1 = setTimeout(() => setPhase("images"), 600);
     } else if (phase === "images") {
-      timer2 = setTimeout(() => setPhase("exit"), 2500);
+      timer2 = setTimeout(() => setPhase("exit"), 1200);
     } else if (phase === "exit") {
       const timer3 = setTimeout(() => {
         window.dispatchEvent(new Event("introComplete"));
         setShouldRender(false);
-      }, 1500);
+      }, 800);
       return () => clearTimeout(timer3);
     }
 
@@ -160,7 +160,7 @@ export function CinematicIntro() {
       ref={containerRef}
       initial={{ opacity: 1 }}
       animate={{ opacity: phase === "exit" ? 0 : 1 }}
-      transition={{ duration: 1.5, ease: "easeInOut", delay: 0.5 }}
+      transition={{ duration: 0.8, ease: "easeInOut", delay: 0.2 }}
       className="fixed inset-0 z-[200] flex items-center justify-center bg-timber-beige overflow-hidden pointer-events-auto"
       style={{
         pointerEvents: phase === "exit" ? "none" : "auto"
@@ -194,7 +194,7 @@ export function CinematicIntro() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
-            transition={{ duration: 1, ease: "easeInOut" }}
+            transition={{ duration: 0.6, ease: "easeInOut" }}
             className="absolute z-50 flex items-center justify-center"
           >
             <div className="relative w-64 md:w-96 aspect-[3/1]">
