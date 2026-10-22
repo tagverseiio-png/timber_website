@@ -35,6 +35,7 @@ import {
 import { formatPrice, rupeesToPaise, paiseToRupees } from "@/lib/money";
 import Image from "next/image";
 import { ALL_PRODUCTS } from "@/app/projects/reference/shop_data_backup";
+import { BOUTIQUE_PRODUCTS } from "@/lib/products/boutique_seed";
 
 const ADMIN_PAGE_SIZE = 12;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -457,6 +458,72 @@ export default function AdminPanel() {
     }
   };
 
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; name: string } | null>(null);
+
+  const uploadBoutiqueProducts = async () => {
+    if (
+      !window.confirm(
+        "Upload all 16 boutique products with images to Firebase Storage & Database? This replaces /projects."
+      )
+    )
+      return;
+    try {
+      const projectsObject: Record<string, unknown> = {};
+      const total = BOUTIQUE_PRODUCTS.length;
+
+      for (let i = 0; i < total; i++) {
+        const curr = BOUTIQUE_PRODUCTS[i];
+        setUploadProgress({ current: i + 1, total, name: curr.name });
+
+        let imageUrl = curr.image;
+
+        // Upload the local image to Firebase Storage
+        try {
+          const resp = await fetch(curr.image);
+          if (resp.ok) {
+            const blob = await resp.blob();
+            const ext = curr.image.split(".").pop()?.toLowerCase() || "jpeg";
+            const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+            const path = `products/${curr.id}/${curr.slug}.${ext}`;
+            const sRef = storageRef(storage, path);
+            const task = uploadBytesResumable(sRef, blob, { contentType });
+
+            // Wait for upload to complete
+            await new Promise<void>((resolve, reject) => {
+              task.on("state_changed", null, reject, () => resolve());
+            });
+            imageUrl = await getDownloadURL(task.snapshot.ref);
+          }
+        } catch (imgErr) {
+          console.warn(`Image upload failed for ${curr.name}, using local path`, imgErr);
+        }
+
+        projectsObject[curr.id] = {
+          name: curr.name,
+          slug: curr.slug,
+          category: curr.category,
+          pricePaise: curr.pricePaise,
+          currency: "INR",
+          stock: curr.stock,
+          description: curr.description,
+          images: [imageUrl],
+          type: curr.type,
+          orderIndex: curr.orderIndex,
+          isActive: true,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+      }
+
+      await set(ref(database, "projects"), projectsObject);
+      setUploadProgress(null);
+      notify("success", `All ${total} boutique products uploaded with images to Firebase!`);
+    } catch (error: unknown) {
+      setUploadProgress(null);
+      notify("error", error instanceof Error ? error.message : "Upload failed.");
+    }
+  };
+
   const softDelete = async (p: CatalogProduct) => {
     if (!window.confirm(`Hide "${p.name}" from the storefront? (soft delete — reversible)`)) return;
     try {
@@ -606,18 +673,45 @@ export default function AdminPanel() {
           </p>
           <div className="flex flex-wrap gap-3">
             <button
+              onClick={uploadBoutiqueProducts}
+              disabled={!!uploadProgress}
+              className="px-6 py-2.5 bg-timber-teal text-white rounded-md hover:bg-timber-darkwood transition font-medium text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {uploadProgress ? `Uploading ${uploadProgress.current}/${uploadProgress.total}…` : "Upload 16 Products to Storage"}
+            </button>
+            <button
               onClick={clearAllProducts}
-              className="px-6 py-2.5 bg-red-700 text-white rounded-md hover:bg-red-800 transition font-medium text-sm"
+              disabled={!!uploadProgress}
+              className="px-6 py-2.5 bg-red-700 text-white rounded-md hover:bg-red-800 transition font-medium text-sm disabled:opacity-50"
             >
               Delete All Products from Firebase
             </button>
             <button
               onClick={pushSeeds}
-              className="px-6 py-2.5 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 transition font-medium text-sm"
+              disabled={!!uploadProgress}
+              className="px-6 py-2.5 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 transition font-medium text-sm disabled:opacity-50"
             >
               Restore All Products from Backup
             </button>
           </div>
+          {uploadProgress && (
+            <div className="mt-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div
+                    className="bg-timber-teal h-2.5 rounded-full transition-all duration-300"
+                    style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                  />
+                </div>
+                <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                  {uploadProgress.current}/{uploadProgress.total}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500">
+                Uploading: <strong>{uploadProgress.name}</strong>
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-col md:flex-row gap-3 md:items-center">
