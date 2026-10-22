@@ -54,8 +54,10 @@ export function HeroSection() {
   const imageX = useTransform(smoothMouseX, [-0.5, 0.5], [10, -10]);
   const imageY = useTransform(smoothMouseY, [-0.5, 0.5], [10, -10]);
   const textX = useTransform(smoothMouseX, [-0.5, 0.5], [-5, 5]);
-  const textY = useTransform(smoothMouseY, [-0.5, 0.5], [-5, 5]);
   const grainX = useTransform(smoothMouseX, [-0.5, 0.5], [-15, 15]);
+  // Scroll + mouse parallax combined in ONE stable hook (calling useTransform
+  // inline in the style prop recreated it every render and broke hook order).
+  const imageParallaxY = useTransform([imageScrollY, imageY], ([scroll, mouse]) => (scroll as number) + (mouse as number));
 
   const lightingBackground = useTransform(
     [smoothMouseX, smoothMouseY],
@@ -161,12 +163,12 @@ export function HeroSection() {
         variants={shouldReduceMotion ? { hidden: { opacity: 0 }, visible: { opacity: 1 } } : imageVariants}
         style={{
           x: shouldReduceMotion ? 0 : imageX,
-          y: shouldReduceMotion ? imageScrollY : useTransform(() => imageScrollY.get() + imageY.get()),
+          y: shouldReduceMotion ? imageScrollY : imageParallaxY,
         }}
         className="absolute inset-0 z-0"
       >
         <Image
-          src="/images/hero-bg.jpg.png"
+          src="/images/heropage bg.png"
           alt="Premium Timber Furniture"
           fill
           priority
@@ -217,31 +219,34 @@ export function HeroSection() {
           variants={fadeVariants}
           className="text-timber-beige/80 uppercase tracking-[0.2em] text-xs md:text-sm font-semibold mb-6"
         >
-          TIMBER TEST 123
+          Premium Handcrafted Furniture
         </motion.p>
 
-        <motion.div variants={textContainerVariants} className="overflow-hidden mb-2 flex gap-4 flex-wrap justify-center lg:justify-start">
-          {["Crafted", "by", "Nature."].map((word, i) => (
-            <motion.h1
-              key={i}
-              variants={wordVariants}
-              className={`font-serif text-5xl sm:text-7xl md:text-8xl lg:text-9xl text-timber-beige tracking-tight leading-[1.1] ${i === 2 ? 'italic' : ''}`}
-            >
-              {word}
-            </motion.h1>
-          ))}
-        </motion.div>
-        <motion.div variants={textContainerVariants} className="overflow-hidden mb-8 flex gap-4 flex-wrap justify-center lg:justify-start">
-          {["Designed", "for", "Life."].map((word, i) => (
-            <motion.h1
-              key={i}
-              variants={wordVariants}
-              className="font-serif text-5xl sm:text-7xl md:text-8xl lg:text-9xl text-timber-beige tracking-tight leading-[1.1]"
-            >
-              {word}
-            </motion.h1>
-          ))}
-        </motion.div>
+        {/* Single H1 for the page: both headline rows live inside it so crawlers
+            and screen readers get one clear heading with identical visuals. */}
+        <motion.h1 variants={textContainerVariants} className="m-0 font-serif text-5xl sm:text-7xl md:text-8xl lg:text-9xl text-timber-beige tracking-tight leading-[1.1]">
+          <span className="overflow-hidden mb-2 flex gap-4 flex-wrap justify-center lg:justify-start">
+            {["Crafted", "by", "Nature."].map((word, i) => (
+              <motion.span
+                key={i}
+                variants={wordVariants}
+                className={i === 2 ? 'italic' : ''}
+              >
+                {word}
+              </motion.span>
+            ))}
+          </span>
+          <span className="overflow-hidden mb-8 flex gap-4 flex-wrap justify-center lg:justify-start">
+            {["Designed", "for", "Life."].map((word, i) => (
+              <motion.span
+                key={i}
+                variants={wordVariants}
+              >
+                {word}
+              </motion.span>
+            ))}
+          </span>
+        </motion.h1>
 
         <motion.p
           variants={fadeVariants}

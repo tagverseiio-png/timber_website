@@ -1,47 +1,44 @@
 import { HeroSection } from "@/components/ui/HeroSection";
-import { BeforeAfterSlider } from "@/components/ui/BeforeAfterSlider";
+import dynamic from "next/dynamic";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { TimberStory } from "@/components/ui/TimberStory";
 import { ProductCard } from "@/components/ui/ProductCard";
 import { StatsStrip } from "@/components/ui/StatsStrip";
-import { CinematicIntro } from "@/components/ui/CinematicIntro";
 import { WoodShavingCursor } from "@/components/layout/WoodShavingCursor";
-import Image from "next/image";
+import { fetchFeaturedProducts } from "@/lib/products/server";
+import { canonical } from "@/lib/seo";
 
-// Mock products for the homepage showcase
-const featuredProducts = [
-  {
-    id: "prod-1",
-    name: "The Artisan Dining Table",
-    price: 2400,
-    woodType: "Solid Oak",
-    image: "/images/table.jpg",
-    rating: 5,
-    category: "Tables"
-  },
-  {
-    id: "prod-2",
-    name: "Classic Timber Bedframe",
-    price: 1850,
-    woodType: "Mahogany",
-    image: "/images/book_self.jpg",
-    rating: 4.8,
-    category: "Beds"
-  },
-  {
-    id: "prod-3",
-    name: "Ornate Reading Chair",
-    price: 850,
-    woodType: "Walnut & Leather",
-    image: "/images/media_1789478474046.png",
-    rating: 4.9,
-    category: "Chairs"
-  }
-];
+// Split from the initial bundle: the intro is a fixed overlay and the
+// slider sits far below the fold. Both are SSR-safe ("use client" with
+// window/sessionStorage access inside effects only), so plain dynamic()
+// code-splits without removing them from server HTML (no CLS/SEO cost).
+const CinematicIntro = dynamic(
+  () => import("@/components/ui/CinematicIntro").then((m) => m.CinematicIntro)
+);
+const BeforeAfterSlider = dynamic(
+  () => import("@/components/ui/BeforeAfterSlider").then((m) => m.BeforeAfterSlider)
+);
+// Live data: the SAME /projects node the admin panel writes (ISR, 5 min).
+// Falls back to an empty section at build time / on outage.
+export default async function Home() {
+  const featuredProducts = await fetchFeaturedProducts(3);
 
-export default function Home() {
+  const orgJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Timber Furniture Co.",
+    url: canonical("/"),
+    logo: canonical("/images/logo.png"),
+    description:
+      "Premium handcrafted timber furniture — sustainably sourced solid wood, built for generations.",
+  };
+
   return (
     <main className="flex min-h-screen flex-col bg-timber-beige">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+      />
       <CinematicIntro />
       <WoodShavingCursor />
       {/* Hero Section */}
@@ -77,7 +74,8 @@ export default function Home() {
       {/* Animated Stats Strip */}
       <StatsStrip />
 
-      {/* Featured Products Showcase */}
+      {/* Featured Products Showcase (hidden when the catalog is empty) */}
+      {featuredProducts.length > 0 && (
       <section className="py-24 px-6 md:px-12 lg:px-24 max-w-7xl mx-auto w-full">
         <ScrollReveal>
           <div className="flex flex-col items-center text-center mb-16">
@@ -92,6 +90,7 @@ export default function Home() {
           </div>
         </ScrollReveal>
       </section>
+      )}
     </main>
   );
 }

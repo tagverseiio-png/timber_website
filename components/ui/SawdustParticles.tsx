@@ -1,38 +1,45 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useMemo } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 
 interface Particle {
   id: number;
   x: number;
   y: number;
   size: number;
+  opacity: number;
   duration: number;
   delay: number;
+  drift: number;
+  rotate: number;
 }
 
+const PARTICLE_COUNT = 24;
+
 export function SawdustParticles() {
-  const [particles, setParticles] = useState<Particle[]>([]);
+  const shouldReduceMotion = useReducedMotion();
 
-  useEffect(() => {
-    // Generate random particles
-    const particleCount = 40;
-    const newParticles: Particle[] = [];
-
-    for (let i = 0; i < particleCount; i++) {
-      newParticles.push({
+  // Precompute once: previously Math.random() ran on every render, which both
+  // churned values each render and risked hydration mismatches.
+  const particles = useMemo<Particle[]>(
+    () =>
+      Array.from({ length: PARTICLE_COUNT }, (_, i) => ({
         id: i,
-        x: Math.random() * 100, // random start X position (vw)
-        y: Math.random() * 100, // random start Y position (vh)
+        x: Math.random() * 100, // start X (vw %)
+        y: Math.random() * 100, // start Y (vh %)
         size: Math.random() * 3 + 1, // 1px to 4px
+        opacity: 0.2 + Math.random() * 0.4,
         duration: Math.random() * 20 + 10, // 10s to 30s
-        delay: Math.random() * 5, // 0s to 5s delay
-      });
-    }
+        delay: Math.random() * 5, // 0s to 5s
+        drift: (Math.random() - 0.5) * 500, // horizontal drift (%)
+        rotate: Math.random() * 360,
+      })),
+    []
+  );
 
-    setParticles(newParticles);
-  }, []);
+  // No perpetual animation work for users who prefer reduced motion.
+  if (shouldReduceMotion) return null;
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-20">
@@ -45,13 +52,13 @@ export function SawdustParticles() {
             top: `${p.y}%`,
             width: p.size,
             height: p.size,
-            opacity: 0.2 + Math.random() * 0.4,
+            opacity: p.opacity,
           }}
           animate={{
             y: ["0%", "-1000%"],
-            x: ["0%", `${(Math.random() - 0.5) * 500}%`],
+            x: ["0%", `${p.drift}%`],
             opacity: [0, 0.6, 0],
-            rotate: Math.random() * 360,
+            rotate: p.rotate,
           }}
           transition={{
             duration: p.duration,

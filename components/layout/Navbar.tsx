@@ -5,11 +5,13 @@ import Link from "next/link";
 import { Search, ShoppingBag, Menu, X, Heart } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
+import { useCartStore } from "@/store/useCartStore";
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const cartCount = useCartStore((s) => s.count());
 
   useEffect(() => {
     const handleScroll = () => {
@@ -70,12 +72,14 @@ export function Navbar() {
           <Link href="/wishlist" aria-label="Wishlist" className="hover:text-timber-teal transition-colors interactive hidden sm:block">
             <Heart size={20} strokeWidth={1.5} />
           </Link>
-          <button aria-label="Cart" className="hover:text-timber-teal transition-colors relative interactive">
+          <Link href="/cart" aria-label="Cart" className="hover:text-timber-teal transition-colors relative interactive">
             <ShoppingBag size={20} strokeWidth={1.5} />
-            <span className="absolute -top-1 -right-1.5 bg-timber-teal text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
-              0
-            </span>
-          </button>
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-1.5 bg-timber-teal text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            )}
+          </Link>
           
           {/* Mobile Menu Toggle */}
           <button 

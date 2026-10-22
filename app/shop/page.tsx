@@ -1,1020 +1,67 @@
 "use client";
 
-import { useState, Suspense, useEffect } from "react";
+import { useState, Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { ProductCard, Product } from "@/components/ui/ProductCard";
+import { ProductCard } from "@/components/ui/ProductCard";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
-import { Filter, ChevronDown } from "lucide-react";
-
-// Mock data
-const ALL_PRODUCTS: Product[] = [
-  ...[
-    "4630828655134806892_IMG_2887.jpg",
-    "7527029664_IMG_5598.jpg",
-    "7583922320_IMG_2208.jpg",
-    "IMG_0102.jpg",
-    "IMG_0782.jpg",
-    "IMG_1061.jpg",
-    "IMG_1160.jpg",
-    "IMG_1626.jpg",
-    "IMG_1774.jpg",
-    "IMG_2516.JPG",
-    "IMG_3129.jpg",
-    "IMG_4417.jpg",
-    "IMG_5166.jpg",
-    "IMG_5315.jpg",
-    "IMG_5971.jpg",
-    "IMG_6566.jpg",
-    "IMG_6969.jpg",
-    "IMG_8718.jpg",
-    "IMG_8746.jpg"
-  ].map((img, i, arr) => ({
-    id: `2seater-${i}`,
-    name: `2 Seaters ${i + 1}`,
-    price: 1500 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/2%20SEATERS/${img}`,
-    hoverImage: `/images/2%20SEATERS/${arr[(i + 1) % arr.length]}`,
-    rating: 4.8,
-    category: "2 seaters"
-  })),
-  ...[
-    "10765100800_IMG_7990.jpg",
-    "FullSizeRend3.jpg",
-    "IMG_1266.jpg",
-    "IMG_2737.jpg",
-    "IMG_5158.jpg",
-    "IMG_8552.jpg"
-  ].map((img, i, arr) => ({
-    id: `3seater-${i}`,
-    name: `3 Seaters ${i + 1}`,
-    price: 2500 + i * 50,
-    woodType: "Premium Timber",
-    image: `/images/3%20SEATERS/${img}`,
-    hoverImage: `/images/3%20SEATERS/${arr[(i + 1) % arr.length]}`,
-    rating: 4.9,
-    category: "3 seaters"
-  })),
-  ...[
-    "-1618728961451789600_IMG_0321.jpg",
-    "10749704016_IMG_7532.JPG",
-    "5200557774938736229_IMG_0330.jpg",
-    "FullSizeRend.jpg",
-    "IMG_5905.jpg",
-    "IMG_8549.jpg",
-    "IMG_8559.jpg",
-    "IMG_8957.jpg",
-    "IMG_9806.JPG",
-    "bar1.jpg"
-  ].map((img, i, arr) => ({
-    id: `bar-unit-${i}`,
-    name: `Bar Unit ${i + 1}`,
-    price: 3500 + i * 100,
-    woodType: "Premium Timber",
-    image: `/images/BAR%20UNITS/${img}`,
-    hoverImage: `/images/BAR%20UNITS/${arr[(i + 1) % arr.length]}`,
-    rating: 4.7,
-    category: "bar units"
-  })),
-  ...[
-    "10784526272_IMG_7433.jpg",
-    "IMG_4609.jpg",
-    "IMG_8061.jpg",
-    "IMG_8145.jpg",
-    "IMG_9170.jpg",
-    "book singke.jpg"
-  ].map((img, i, arr) => ({
-    id: `bookshelf-${i}`,
-    name: `Book Shelf ${i + 1}`,
-    price: 1200 + i * 50,
-    woodType: "Premium Timber",
-    image: `/images/BOOK%20SHELF/${img}`,
-    hoverImage: `/images/BOOK%20SHELF/${arr[(i + 1) % arr.length]}`,
-    rating: 4.8,
-    category: "book shelves"
-  })),
-  ...[
-    "IMG_0197.jpg",
-    "IMG_0665.jpg",
-    "IMG_4113.jpg",
-    "IMG_6621.jpg",
-    "IMG_6936.jpg",
-    "IMG_7073.jpg",
-    "IMG_7179.jpg",
-    "IMG_7817.jpg",
-    "IMG_8233.jpg"
-  ].map((img, i, arr) => ({
-    id: `buffet-${i}`,
-    name: `Buffet ${i + 1}`,
-    price: 2800 + i * 75,
-    woodType: "Premium Timber",
-    image: `/images/BUFFET/${img}`,
-    hoverImage: `/images/BUFFET/${arr[(i + 1) % arr.length]}`,
-    rating: 4.9,
-    category: "buffets"
-  }))
-,
-
-  ...[
-    "10765098016_IMG_7971.jpg",
-    "IMG_0638.jpg",
-    "IMG_1361.jpg",
-    "IMG_1389.jpg",
-    "IMG_1459.JPG",
-    "IMG_3505.jpg",
-    "IMG_3783.jpg",
-    "IMG_3796.jpg",
-    "IMG_6453.jpg",
-    "IMG_6461.jpg",
-    "IMG_7249.JPG",
-    "IMG_7257.JPG",
-    "IMG_8582.jpg",
-    "IMG_8602.jpg"
-].map((img, i, arr) => ({
-    id: `chest-boxes-${i}`,
-    name: `Chest Box ${i + 1}`,
-    price: 800 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/CHEST%20BOX/${img}`,
-    hoverImage: `/images/CHEST%20BOX/${arr[(i + 1) % arr.length]}`,
-    rating: 4.8,
-    category: "chest boxes"
-  })),
-  ...[
-    "-9037620449013485497_IMG_0354.jpg",
-    "IMG_0614.jpg",
-    "IMG_0673.jpg",
-    "IMG_3003.jpg",
-    "IMG_3016.jpg",
-    "IMG_5191.jpg",
-    "IMG_6689.jpg",
-    "IMG_7141.JPG",
-    "IMG_7470.jpg",
-    "IMG_8796.jpg",
-    "IMG_8827.jpg"
-].map((img, i, arr) => ({
-    id: `chest-of-draws-${i}`,
-    name: `Chest of Draws ${i + 1}`,
-    price: 900 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/CHEST%20OF%20DRAWS/${img}`,
-    hoverImage: `/images/CHEST%20OF%20DRAWS/${arr[(i + 1) % arr.length]}`,
-    rating: 4.8,
-    category: "chest of draws"
-  })),
-  ...[
-    "10800522096_IMG_7751.JPG",
-    "IMG_0441.jpg",
-    "IMG_0660.jpg",
-    "IMG_4180.jpg",
-    "IMG_4485.jpg",
-    "IMG_6648.jpg",
-    "IMG_7092.jpg",
-    "IMG_8860.jpg",
-    "PHOTO-2025-10-15-10-30-07.JPG"
-].map((img, i, arr) => ({
-    id: `diwans-${i}`,
-    name: `Diwan ${i + 1}`,
-    price: 1200 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/DIWANS/${img}`,
-    hoverImage: `/images/DIWANS/${arr[(i + 1) % arr.length]}`,
-    rating: 4.8,
-    category: "diwans"
-  })),
-  ...[
-    "-1508847947757365348_IMG_9294.jpg",
-    "-2013317261961559399_IMG_9319.jpg",
-    "-3471861872587221794_IMG_9349.jpg",
-    "-3781572941410219870_IMG_1234.JPG",
-    "-4773943783391548380_IMG_0688.jpg",
-    "-5920494287487211843_IMG_9434.jpg",
-    "-6980275401029026893_IMG_9409.jpg",
-    "2487603831200376249_IMG_9299.jpg",
-    "4324065512363268751_IMG_9416.jpg",
-    "510423934098612405_IMG_9333.jpg",
-    "5200557774938736229_IMG_0330.jpg",
-    "6224231884115142106_IMG_9312.jpg",
-    "7199727265482167310_IMG_9426.jpg",
-    "7516730736_IMG_1808.jpg",
-    "7516772896_IMG_1987.JPG",
-    "7516837696_IMG_1415.jpg",
-    "7526952384_IMG_5530.jpg",
-    "9049698661035413466_IMG_9367.jpg",
-    "FullSize25jpg.jpg",
-    "IMG_0175.jpg",
-    "IMG_0311.JPG",
-    "IMG_0492.jpg",
-    "IMG_0512.jpg",
-    "IMG_1317.JPG",
-    "IMG_2584.jpg",
-    "IMG_2682.jpg",
-    "IMG_2923.jpg",
-    "IMG_2973.jpg",
-    "IMG_3022.jpg",
-    "IMG_3038.jpg",
-    "IMG_3060.jpg",
-    "IMG_3075.jpg",
-    "IMG_3306.jpg",
-    "IMG_3312.jpg",
-    "IMG_3354.JPG",
-    "IMG_3625.jpg",
-    "IMG_3895.jpg",
-    "IMG_3958.jpg",
-    "IMG_3992.jpg",
-    "IMG_4016.jpg",
-    "IMG_4058.jpg",
-    "IMG_4065.jpg",
-    "IMG_4075.jpg",
-    "IMG_4141.jpg",
-    "IMG_4202.jpg",
-    "IMG_4736.jpg",
-    "IMG_4763.jpg",
-    "IMG_5389.jpg",
-    "IMG_5896.jpg",
-    "IMG_6431.jpg",
-    "IMG_7005.JPG",
-    "IMG_7429.jpg",
-    "IMG_7449.jpg",
-    "IMG_7471.JPG",
-    "IMG_7744 - Copy.JPG",
-    "IMG_7757 - Copy.JPG",
-    "IMG_7766 - Copy.JPG",
-    "IMG_7775.JPG",
-    "IMG_7789.JPG",
-    "IMG_7798.jpg",
-    "IMG_8374.jpg",
-    "IMG_8378.jpg",
-    "IMG_8383.jpg",
-    "IMG_8496.jpg",
-    "IMG_8886.JPG",
-    "IMG_9609.JPG",
-    "IMG_9614.JPG",
-    "IMG_9622.JPG",
-    "IMG_9723.jpg",
-    "towel4.jpg"
-].map((img, i, arr) => ({
-    id: `misc-${i}`,
-    name: `Misc Item ${i + 1}`,
-    price: 500 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/MISC/${img}`,
-    hoverImage: `/images/MISC/${arr[(i + 1) % arr.length]}`,
-    rating: 4.8,
-    category: "misc"
-  })),
-  ...[
-    "-3014583562918305309_IMG_3223.jpg",
-    "009.jpg",
-    "bench.JPG",
-    "heavy.jpg",
-    "img 9482.jpg",
-    "IMG_0353.JPG",
-    "IMG_1203.JPG",
-    "IMG_1331.JPG",
-    "IMG_1487.jpg",
-    "IMG_1493.jpg",
-    "IMG_1512.jpg",
-    "IMG_1646.JPG",
-    "IMG_1667.JPG",
-    "IMG_2871.jpg",
-    "IMG_4097.JPG",
-    "IMG_4120.JPG",
-    "IMG_4288.jpg",
-    "IMG_4294.jpg",
-    "IMG_4603.JPG",
-    "IMG_7324.jpg",
-    "IMG_7512.jpg",
-    "IMG_7775.jpg",
-    "IMG_7812.jpg",
-    "IMG_7998.jpg",
-    "IMG_9883.JPG",
-    "wood.JPG"
-].map((img, i, arr) => ({
-    id: `outdoor-${i}`,
-    name: `Outdoor Furniture ${i + 1}`,
-    price: 1100 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/OUTDOOR/${img}`,
-    hoverImage: `/images/OUTDOOR/${arr[(i + 1) % arr.length]}`,
-    rating: 4.8,
-    category: "outdoor"
-  })),
-  ...[
-    "48.JPG",
-    "e20f1447-b10b-4c01-9bb5-bc56007badba.jpg",
-    "FullSizeRen9.jpg",
-    "IMG_2185.jpg",
-    "IMG_2213.jpg",
-    "IMG_3579.jpg",
-    "IMG_3589.jpg",
-    "IMG_8142.jpg"
-].map((img, i, arr) => ({
-    id: `puja-units-${i}`,
-    name: `Puja Unit ${i + 1}`,
-    price: 1500 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/PUJA%20UNITS/${img}`,
-    hoverImage: `/images/PUJA%20UNITS/${arr[(i + 1) % arr.length]}`,
-    rating: 4.8,
-    category: "puja units"
-  })),
-  ...[
-    "7653038896_IMG_2353.jpg",
-    "IMG_0907.JPG",
-    "IMG_2616.JPG",
-    "IMG_2619.JPG",
-    "IMG_5208.jpg",
-    "IMG_5986.JPG",
-    "IMG_7120.JPG",
-    "IMG_8675.JPG",
-    "IMG_8680.JPG",
-    "IMG_9823.JPG"
-].map((img, i, arr) => ({
-    id: `shoe-racks-${i}`,
-    name: `Shoe Rack ${i + 1}`,
-    price: 600 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/SHOE%20RACKS/${img}`,
-    hoverImage: `/images/SHOE%20RACKS/${arr[(i + 1) % arr.length]}`,
-    rating: 4.8,
-    category: "shoe racks"
-  })),
-  ...[
-    "08576ffb-d4ec-4d8e-a214-f28bfca3c471.JPG",
-    "3233562398954686169_IMG_3022.JPG",
-    "584ef79c-7813-41ae-a5e2-ea048d023896.jpg",
-    "5aa36df8-8446-4b64-9c39-1b70fee73601.jpg",
-    "63544127-e510-4153-8789-9254d6a5ce97.jpg",
-    "ca55c041-1e6f-47aa-8938-308ec1d2cda3.jpg",
-    "IMG_3083.jpg",
-    "IMG_4519.jpg",
-    "IMG_4673.jpg",
-    "IMG_5065.jpg",
-    "IMG_8145.jpg",
-    "IMG_8549.jpg",
-    "IMG_8648.jpg",
-    "IMG_9567.JPG"
-].map((img, i, arr) => ({
-    id: `showcases-${i}`,
-    name: `Showcase ${i + 1}`,
-    price: 2000 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/SHOWCASE/${img}`,
-    hoverImage: `/images/SHOWCASE/${arr[(i + 1) % arr.length]}`,
-    rating: 4.8,
-    category: "showcases"
-  })),
-  ...[
-    "CSP00492.JPG",
-    "DSC04934.JPG",
-    "DSC05006.JPG",
-    "IMG_1727.JPG",
-    "IMG_1799.JPG",
-    "IMG_1913.jpg",
-    "IMG_2267.jpg",
-    "IMG_2570.jpg",
-    "IMG_5138.jpg",
-    "IMG_5480.jpg",
-    "IMG_5486.jpg",
-    "IMG_6744.JPG",
-    "IMG_7543.jpg",
-    "IMG_7790.JPG",
-    "IMG_7848.JPG",
-    "IMG_8530.jpg",
-    "IMG_8571.JPG"
-].map((img, i, arr) => ({
-    id: `sofas-${i}`,
-    name: `Sofa ${i + 1}`,
-    price: 2500 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/SOFAS/${img}`,
-    hoverImage: `/images/SOFAS/${arr[(i + 1) % arr.length]}`,
-    rating: 4.8,
-    category: "sofas"
-  })),
-  ...[
-    "7516773616_IMG_3422.JPG",
-    "7516773616_IMG_3424.JPG",
-    "FullSizeRender.JPG",
-    "IMG_0294.jpg",
-    "IMG_1836.jpg",
-    "IMG_1843.jpg",
-    "IMG_8727.JPG",
-    "IMG_8862.JPG"
-].map((img, i, arr) => ({
-    id: `wardrobes-${i}`,
-    name: `Wardrobe ${i + 1}`,
-    price: 3000 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/WARDROBES/${img}`,
-    hoverImage: `/images/WARDROBES/${arr[(i + 1) % arr.length]}`,
-    rating: 4.8,
-    category: "wardrobes"
-  }))
-,
-
-  ...[
-    "10749978032_IMG_7603.JPG",
-    "10749983600_IMG_7594.JPG",
-    "55.JPG",
-    "7596226176_IMG_5148.JPG",
-    "7598270144_IMG_5108.jpg",
-    "FullSize12.jpg",
-    "FullSize15.jpg",
-    "IMG_0218.jpg",
-    "IMG_0238.jpg",
-    "IMG_0265.jpg",
-    "IMG_0296.jpg",
-    "IMG_0341.jpg",
-    "IMG_0359.jpg",
-    "IMG_0394.jpg",
-    "IMG_0419.jpg",
-    "IMG_0966.jpg",
-    "IMG_0982.jpg",
-    "IMG_1016.jpg",
-    "IMG_1028.jpg",
-    "IMG_1045.jpg",
-    "IMG_1055.jpg",
-    "IMG_1059.jpg",
-    "IMG_1076.jpg",
-    "IMG_1094.jpg",
-    "IMG_1115.jpg",
-    "IMG_1133.jpg",
-    "IMG_1164.JPG",
-    "IMG_1181.jpg",
-    "IMG_1187.JPG",
-    "IMG_1206.jpg",
-    "IMG_1238.jpg",
-    "IMG_1331.jpg",
-    "IMG_1422.jpg",
-    "IMG_1440.jpg",
-    "IMG_1551.jpg",
-    "IMG_1559.jpg",
-    "IMG_2739.jpg",
-    "IMG_2834.jpg",
-    "IMG_2974.jpg",
-    "IMG_3002.JPG",
-    "IMG_3039.JPG",
-    "IMG_3058.jpg",
-    "IMG_3073.JPG",
-    "IMG_3201.jpg",
-    "IMG_3223.jpg",
-    "IMG_3268.JPG",
-    "IMG_3279.jpg",
-    "IMG_3280.jpg",
-    "IMG_3298.jpg",
-    "IMG_3353.jpg",
-    "IMG_3359.jpg",
-    "IMG_3362.jpg",
-    "IMG_3364.jpg",
-    "IMG_3381.JPG",
-    "IMG_3384.jpg",
-    "IMG_3393.jpg",
-    "IMG_3399.JPG",
-    "IMG_3403.JPG",
-    "IMG_3405.jpg",
-    "IMG_3408.JPG",
-    "IMG_3414.jpg",
-    "IMG_3422.jpg",
-    "IMG_3424.jpg",
-    "IMG_3427.JPG",
-    "IMG_3451.JPG",
-    "IMG_3456.jpg",
-    "IMG_3470.JPG",
-    "IMG_3477.jpg",
-    "IMG_3495.jpg",
-    "IMG_3499.jpg",
-    "IMG_3520.JPG",
-    "IMG_3540.JPG",
-    "IMG_3542 - Copy.jpg",
-    "IMG_3547 - Copy.jpg",
-    "IMG_3551.JPG",
-    "IMG_3554 - Copy.jpg",
-    "IMG_3561.JPG",
-    "IMG_3562.jpg",
-    "IMG_3572.jpg",
-    "IMG_3612.jpg",
-    "IMG_3627.jpg",
-    "IMG_3644.jpg",
-    "IMG_3645.JPG",
-    "IMG_3660.JPG",
-    "IMG_3663.jpg",
-    "IMG_3668.jpg",
-    "IMG_3704.jpg",
-    "IMG_3721.JPG",
-    "IMG_3724.jpg",
-    "IMG_3732.jpg",
-    "IMG_3769.jpg",
-    "IMG_3780(1).JPG",
-    "IMG_3801.JPG",
-    "IMG_3809.jpg",
-    "IMG_3822.jpg",
-    "IMG_3825.jpg",
-    "IMG_3832.jpg",
-    "IMG_3835.jpg",
-    "IMG_3869.jpg",
-    "IMG_3921.JPG",
-    "IMG_3926.JPG",
-    "IMG_3952.jpg",
-    "IMG_3966.jpg",
-    "IMG_3973.jpg",
-    "IMG_4102.jpg",
-    "IMG_4113.jpg",
-    "IMG_4126.jpg",
-    "IMG_4180.jpg",
-    "IMG_4507.JPG",
-    "IMG_5046.JPG",
-    "IMG_5051.JPG",
-    "IMG_5073.JPG",
-    "IMG_5410.JPG",
-    "IMG_5448.JPG",
-    "IMG_5468.JPG",
-    "IMG_5481.JPG",
-    "IMG_5498.JPG",
-    "IMG_5509.JPG",
-    "IMG_5519.JPG",
-    "IMG_5628.JPG",
-    "IMG_5652(1).JPG",
-    "IMG_5674.JPG",
-    "IMG_5678.JPG",
-    "IMG_5695.JPG",
-    "IMG_5716.JPG",
-    "IMG_5732.JPG",
-    "IMG_5772(1).JPG",
-    "IMG_5783.jpg",
-    "IMG_5787.jpg",
-    "IMG_5790.JPG",
-    "IMG_5934.JPG",
-    "IMG_6004.jpg",
-    "IMG_6011.jpg",
-    "IMG_6014.jpg",
-    "IMG_6088.JPG",
-    "IMG_6112.jpg",
-    "IMG_6184.jpg",
-    "IMG_6195.jpg",
-    "IMG_7150.jpg",
-    "IMG_7200.jpg",
-    "IMG_7210.jpg",
-    "IMG_7222.jpg",
-    "IMG_7229.jpg",
-    "IMG_7239.JPG",
-    "IMG_7254.jpg",
-    "IMG_7266.jpg",
-    "IMG_7275.jpg",
-    "IMG_7278.jpg",
-    "IMG_7291.jpg",
-    "IMG_7294.jpg",
-    "IMG_7297.jpg",
-    "IMG_7301.jpg",
-    "IMG_7304.jpg",
-    "IMG_7308.jpg",
-    "IMG_7310.jpg",
-    "IMG_7314.jpg",
-    "IMG_7316.jpg",
-    "IMG_7321.jpg",
-    "IMG_7325.jpg",
-    "IMG_7327.jpg",
-    "IMG_7332.jpg",
-    "IMG_7336.jpg",
-    "IMG_7340.jpg",
-    "IMG_7346.jpg",
-    "IMG_7347.jpg",
-    "IMG_7352.jpg",
-    "IMG_7355.jpg",
-    "IMG_7370.jpg",
-    "IMG_7375.jpg",
-    "IMG_7376.JPG",
-    "IMG_7381.jpg",
-    "IMG_7394.jpg",
-    "IMG_7409.jpg",
-    "IMG_7418.jpg",
-    "IMG_7427.jpg",
-    "IMG_7430.jpg",
-    "IMG_7441.jpg",
-    "IMG_7455.jpg",
-    "IMG_7459.jpg",
-    "IMG_7466.jpg",
-    "IMG_7472.jpg",
-    "IMG_7474.JPG",
-    "IMG_7488.jpg",
-    "IMG_7504.jpg",
-    "IMG_7512.jpg",
-    "IMG_7519.jpg",
-    "IMG_7529.jpg",
-    "IMG_7535.jpg",
-    "IMG_7543.jpg",
-    "IMG_7551.jpg",
-    "IMG_7554.jpg",
-    "IMG_7564.jpg",
-    "IMG_7572.jpg",
-    "IMG_7593.jpg",
-    "IMG_7616.jpg",
-    "IMG_7628.jpg",
-    "IMG_7637.jpg",
-    "IMG_7641.jpg",
-    "IMG_7648.jpg",
-    "IMG_7657.jpg",
-    "IMG_7675.jpg",
-    "IMG_7691.jpg",
-    "IMG_7696.jpg",
-    "IMG_7706.jpg",
-    "IMG_7710.jpg",
-    "IMG_7715.jpg",
-    "IMG_7734.jpg",
-    "IMG_7740.jpg",
-    "IMG_7741.jpg",
-    "IMG_7752.jpg",
-    "IMG_7768.jpg",
-    "IMG_7792.jpg",
-    "IMG_7796.jpg",
-    "IMG_7816.jpg",
-    "IMG_7827.jpg",
-    "IMG_7839.jpg",
-    "IMG_7850.jpg",
-    "IMG_7861.jpg",
-    "IMG_7869.jpg",
-    "IMG_7884.jpg",
-    "IMG_7892.jpg",
-    "IMG_7906.jpg",
-    "IMG_7911.jpg",
-    "IMG_7921.JPG",
-    "IMG_7926.jpg",
-    "IMG_7941.jpg",
-    "IMG_7955.JPG",
-    "IMG_7956.jpg",
-    "IMG_7968.jpg",
-    "IMG_7984.jpg",
-    "IMG_7998.jpg",
-    "IMG_8002.jpg",
-    "IMG_8014.jpg",
-    "IMG_8337.jpg",
-    "IMG_8347.jpg",
-    "IMG_8359.jpg",
-    "IMG_8364.jpg",
-    "IMG_8403.jpg",
-    "IMG_8415.jpg",
-    "IMG_8419.jpg",
-    "IMG_8427.jpg",
-    "IMG_8430.jpg",
-    "IMG_8448.jpg",
-    "IMG_8456.jpg",
-    "IMG_8474.jpg",
-    "IMG_8488.jpg",
-    "IMG_8506.jpg",
-    "IMG_8588.JPG",
-    "IMG_8703.JPG",
-    "IMG_9102.jpg",
-    "IMG_9113.jpg",
-    "IMG_9120.jpg",
-    "IMG_9123.jpg",
-    "IMG_9145.jpg",
-    "IMG_9206.jpg",
-    "IMG_9244.jpg",
-    "IMG_9272.jpg",
-    "IMG_9284.jpg",
-    "IMG_9299.jpg",
-    "IMG_9316.jpg",
-    "IMG_9331.jpg",
-    "IMG_9338.jpg",
-    "IMG_9370.jpg",
-    "IMG_9398.jpg",
-    "IMG_9469.jpg",
-    "IMG_9495.jpg",
-    "IMG_9592.jpg",
-    "IMG_9904.JPG"
-].map((img, i, arr) => ({
-    id: `souvenirs-${i}`,
-    name: `Souvenir ${i + 1}`,
-    price: 100 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/SOUVENIERS/${encodeURIComponent(img)}`,
-    hoverImage: `/images/SOUVENIERS/${encodeURIComponent(arr[(i + 1) % arr.length])}`,
-    rating: 4.8,
-    category: "souvenirs"
-  })),
-  ...[
-    "-2489462045821742712_IMG_0052.jpg",
-    "-845730528783807715_IMG_9538.jpg",
-    "011.jpg",
-    "2141569558994303606_IMG_9596.jpg",
-    "7583890320_IMG_0788.jpg",
-    "af4c573d-bcb0-4419-87dd-08d7b4c64134.JPG",
-    "DSC05021.JPG",
-    "FullSizeRend1.jpg",
-    "IMG_0918.jpg",
-    "IMG_0953.JPG",
-    "IMG_1145.jpg",
-    "IMG_1170.jpg",
-    "IMG_1759.jpg",
-    "IMG_1767.jpg",
-    "IMG_1789.jpg",
-    "IMG_3007.jpg",
-    "IMG_4199.jpg",
-    "IMG_5808.jpg",
-    "IMG_6855 - Copy (2).jpg",
-    "IMG_6860.jpg",
-    "IMG_7840.JPG",
-    "IMG_8409.JPG",
-    "IMG_8424.JPG",
-    "IMG_8624.jpg",
-    "IMG_8638.jpg",
-    "IMG_8769.jpg",
-    "IMG_8873.JPG",
-    "IMG_8887.jpg",
-    "IMG_8913.JPG",
-    "IMG_9088.JPG",
-    "IMG_9099.jpg",
-    "IMG_9111.jpg",
-    "IMG_9232.jpg",
-    "IMG_9536.jpg",
-    "IMG_9868.jpg",
-    "IMG_9877.jpg"
-].map((img, i, arr) => ({
-    id: `cots-${i}`,
-    name: `Cot ${i + 1}`,
-    price: 1500 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/COTS/${encodeURIComponent(img)}`,
-    hoverImage: `/images/COTS/${encodeURIComponent(arr[(i + 1) % arr.length])}`,
-    rating: 4.8,
-    category: "cots"
-  })),
-  ...[
-    "7650955584_IMG_1252.JPG",
-    "94.JPG",
-    "FullSizeRen6.jpg",
-    "FullSizeRender.jpg",
-    "img 9426.jpg",
-    "IMG_0816.jpg",
-    "IMG_0849.JPG",
-    "IMG_0850.jpg",
-    "IMG_1176.jpg",
-    "IMG_1193.jpg",
-    "IMG_1236.jpg",
-    "IMG_1664.jpg",
-    "IMG_1706.jpg",
-    "IMG_3129.jpg",
-    "IMG_3163.jpg",
-    "IMG_4232.jpg",
-    "IMG_4298.jpg",
-    "IMG_4853.jpg",
-    "IMG_4901.jpg",
-    "IMG_5178.jpg",
-    "IMG_5205.jpg",
-    "IMG_5328.jpg",
-    "IMG_5544.jpg",
-    "IMG_5582.jpg",
-    "IMG_5669.jpg",
-    "IMG_5752.jpg",
-    "IMG_6049.jpg",
-    "IMG_6158.JPG",
-    "IMG_6567.jpg",
-    "IMG_6572 - Copy.jpg",
-    "IMG_6572.jpg",
-    "IMG_6591.jpg",
-    "IMG_6606.jpg",
-    "IMG_6615.jpg",
-    "IMG_6621.jpg",
-    "IMG_6737.jpg",
-    "IMG_6834.jpg",
-    "IMG_6873.jpg",
-    "IMG_6907.JPG",
-    "IMG_6999.JPG",
-    "IMG_7120.jpg",
-    "IMG_7633.JPG",
-    "IMG_7635.JPG",
-    "IMG_7831.jpg",
-    "IMG_7958.jpg",
-    "IMG_7994.jpg",
-    "IMG_8249.jpg",
-    "IMG_8612.jpg",
-    "IMG_8620.jpg",
-    "IMG_8919.jpg",
-    "IMG_8970.JPG",
-    "IMG_9437.jpg",
-    "IMG_9489.jpg",
-    "IMG_9638.jpg",
-    "IMG_9958.jpg"
-].map((img, i, arr) => ({
-    id: `chairs-${i}`,
-    name: `Chair ${i + 1}`,
-    price: 400 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/CHAIRS/${encodeURIComponent(img)}`,
-    hoverImage: `/images/CHAIRS/${encodeURIComponent(arr[(i + 1) % arr.length])}`,
-    rating: 4.8,
-    category: "chairs"
-  })),
-  ...[
-    "-1010449198044169360_IMG_9694 - Copy.jpg",
-    "-2323501921492979449_IMG_9476.jpg",
-    "-3373719395303881972_IMG_9663.jpg",
-    "-3449395807169639141_IMG_9468.jpg",
-    "-4002093256197204885_IMG_2471.jpg",
-    "-4093965615357588531_IMG_9715.jpg",
-    "-4239197952657124939_IMG_9697.jpg",
-    "-4616956984279332193_IMG_9229.JPG",
-    "-4779181581621123929_IMG_9902.jpg",
-    "-5055140920716497369_IMG_9756.jpg",
-    "-5327151514086990348_IMG_9655.jpg",
-    "-8309540763929655424_IMG_9809.jpg",
-    "-861647399423602197_IMG_9891 - Copy.jpg",
-    "-8744190853933057677_IMG_9925.jpg",
-    "10 - Copy.JPG",
-    "10748322912_IMG_7505 - Copy - Copy - Copy.jpg",
-    "10749666112_IMG_7487 - Copy.jpg",
-    "1984160473852112788_IMG_9483.jpg",
-    "2831977514105611464_IMG_9916.jpg",
-    "2947553560807868289_IMG_9487.jpg",
-    "3465025412763116413_IMG_9676.jpg",
-    "3930206997838487998_IMG_9840.jpg",
-    "4117642896761036163_IMG_9760.jpg",
-    "5637926630118991828_IMG_9853.jpg",
-    "5684930796218619629_IMG_9844.jpg",
-    "5766852269652722942_IMG_9880.jpg",
-    "7110345734564586924_IMG_9934.jpg",
-    "7455526471004641925_IMG_9473.jpg",
-    "7752159895139700681_IMG_9831.jpg",
-    "8675979420192592838_IMG_9658.jpg",
-    "IMG_0774.jpg",
-    "IMG_0794.jpg",
-    "IMG_2151.JPG",
-    "IMG_2562.jpg",
-    "IMG_6236.jpg",
-    "IMG_6240.JPG",
-    "IMG_6246.jpg",
-    "IMG_6262.jpg",
-    "IMG_6287.jpg",
-    "IMG_6290.jpg",
-    "IMG_6412.jpg",
-    "IMG_6421.jpg",
-    "IMG_6666.jpg",
-    "IMG_6689.jpg",
-    "IMG_6711.jpg",
-    "IMG_6741.jpg",
-    "IMG_6767.jpg",
-    "IMG_6890.jpg",
-    "IMG_6909.jpg",
-    "IMG_6939.jpg",
-    "IMG_6951.jpg",
-    "IMG_6975.jpg",
-    "IMG_8206.jpg",
-    "IMG_8217.jpg",
-    "IMG_8359.jpg",
-    "IMG_8774.JPG"
-].map((img, i, arr) => ({
-    id: `mirror-${i}`,
-    name: `Mirror ${i + 1}`,
-    price: 800 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/MIRRORS/${encodeURIComponent(img)}`,
-    hoverImage: `/images/MIRRORS/${encodeURIComponent(arr[(i + 1) % arr.length])}`,
-    rating: 4.8,
-    category: "wallmounts and mirrors"
-  })),
-  ...[
-    "7652898528_IMG_5073.jpg",
-    "FullSize40.jpg",
-    "IMG_0077.PNG",
-    "IMG_0541.JPG",
-    "IMG_0552.JPG",
-    "IMG_1518.JPG",
-    "IMG_1545.JPG",
-    "IMG_1560.JPG",
-    "IMG_1578.JPG",
-    "IMG_1591.JPG",
-    "IMG_1606.JPG",
-    "IMG_1637.JPG",
-    "IMG_1644(1).JPG",
-    "IMG_1672.jpg",
-    "IMG_1714.JPG",
-    "IMG_1740.JPG",
-    "IMG_1784.JPG",
-    "IMG_2112.JPG",
-    "IMG_2126.JPG",
-    "IMG_2135.JPG",
-    "IMG_2328.JPG",
-    "IMG_2408.JPG",
-    "IMG_2489.JPG",
-    "IMG_2574.jpg",
-    "IMG_2580.jpg",
-    "IMG_2594.JPG",
-    "IMG_2596.jpg",
-    "IMG_2617.JPG",
-    "IMG_2784.jpg",
-    "IMG_3274.JPG",
-    "IMG_3351.JPG",
-    "IMG_3696.jpg",
-    "IMG_3728.jpg",
-    "IMG_3769.jpg",
-    "IMG_4220 - Copy.jpg",
-    "IMG_4246 - Copy.jpg",
-    "IMG_4458.jpg",
-    "IMG_6315.JPG",
-    "IMG_6325.JPG",
-    "IMG_6360.JPG",
-    "IMG_6371.JPG",
-    "IMG_6384.JPG",
-    "IMG_6393.jpg",
-    "IMG_6399.JPG",
-    "IMG_6553.JPG",
-    "IMG_6587.jpg",
-    "IMG_6944.JPG",
-    "IMG_6969.JPG",
-    "IMG_6994.JPG",
-    "IMG_7182.JPG",
-    "IMG_7298.JPG",
-    "IMG_7303.JPG",
-    "IMG_7488.JPG",
-    "IMG_7503.JPG",
-    "IMG_7663.JPG",
-    "IMG_8021.jpg",
-    "IMG_8024.jpg",
-    "IMG_8028.jpg",
-    "IMG_8032.jpg",
-    "IMG_8037.jpg",
-    "IMG_8048.jpg",
-    "IMG_8058.jpg",
-    "IMG_8068.jpg",
-    "IMG_8074.jpg",
-    "IMG_8083.jpg",
-    "IMG_8090.jpg",
-    "IMG_8098.jpg",
-    "IMG_8101.jpg",
-    "IMG_8108.jpg",
-    "IMG_8113.jpg",
-    "IMG_8116.jpg",
-    "IMG_8120.jpg",
-    "IMG_8131.jpg",
-    "IMG_8138.jpg",
-    "IMG_8143.jpg",
-    "IMG_8155.jpg",
-    "IMG_8160.jpg",
-    "IMG_8171.jpg",
-    "IMG_8181.jpg",
-    "IMG_8185.jpg",
-    "IMG_8193.jpg",
-    "IMG_8213.jpg",
-    "IMG_8220.jpg",
-    "IMG_8226.jpg",
-    "IMG_8234.jpg",
-    "IMG_8241.jpg",
-    "IMG_8255.jpg",
-    "IMG_8272.jpg",
-    "IMG_8280.jpg",
-    "IMG_8302.jpg",
-    "IMG_8316.jpg",
-    "IMG_8521.jpg",
-    "IMG_8526.jpg",
-    "IMG_8539.jpg",
-    "IMG_8556.jpg",
-    "IMG_8588.jpg",
-    "IMG_8612.jpg",
-    "IMG_8644.jpg",
-    "IMG_9509.jpg"
-].map((img, i, arr) => ({
-    id: `wallmount-${i}`,
-    name: `Wallmount ${i + 1}`,
-    price: 800 + i * 20,
-    woodType: "Premium Timber",
-    image: `/images/WALLMOUNTS/${encodeURIComponent(img)}`,
-    hoverImage: `/images/WALLMOUNTS/${encodeURIComponent(arr[(i + 1) % arr.length])}`,
-    rating: 4.8,
-    category: "wallmounts and mirrors"
-  }))
-];
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
+import { useCatalog } from "@/lib/products/catalog";
+import { Filter, ChevronDown, Search, ChevronLeft, ChevronRight } from "lucide-react";
 
 const CATEGORIES = ["All", "2 Seaters", "3 Seaters", "Bar Units", "Book Shelves", "Buffets", "Chest Boxes", "Chest of Draws", "Diwans", "Misc", "Outdoor", "Puja Units", "Shoe Racks", "Showcases", "Sofas", "Wardrobes", "Souvenirs", "Cots", "Chairs", "Wallmounts and Mirrors"];
+
+// Products per page: only one page of cards is in the DOM at a time.
+const PAGE_SIZE = 24;
 
 function ShopContent() {
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get('category');
   const [activeCategory, setActiveCategory] = useState("All");
   const [sortBy, setSortBy] = useState("featured");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const debouncedQuery = useDebouncedValue(query.trim().toLowerCase(), 250);
 
-  useEffect(() => {
-    if (categoryParam) {
-      const match = CATEGORIES.find(c => c.toLowerCase() === categoryParam.toLowerCase());
-      if (match) {
-        setActiveCategory(match);
-      } else {
-        setActiveCategory("All");
+  // Live catalog: the SAME /projects node the admin panel writes.
+  const { products: catalog, loading, error } = useCatalog();
+
+  // URL (?category=) is external state: adopt it during render via the
+  // previous-value pattern instead of syncing in an effect.
+  const [prevCategoryParam, setPrevCategoryParam] = useState<string | null | undefined>(undefined);
+  if (categoryParam !== prevCategoryParam) {
+    setPrevCategoryParam(categoryParam);
+    const match = categoryParam
+      ? CATEGORIES.find((c) => c.toLowerCase() === categoryParam.toLowerCase())
+      : undefined;
+    setActiveCategory(match ?? "All");
+    setPage(1);
+  }
+
+  // Page resets live in the filter/search/sort handlers below; `safePage`
+  // clamps the current page whenever the result set shrinks.
+  const filteredProducts = useMemo(() => {
+    return catalog.filter((product) => {
+      if (activeCategory !== "All" && product.category.toLowerCase() !== activeCategory.toLowerCase()) {
+        return false;
       }
-    }
-  }, [categoryParam]);
-
-  const filteredProducts = ALL_PRODUCTS.filter((product) => {
-    if (activeCategory === "All") return true;
-    return product.category.toLowerCase() === activeCategory.toLowerCase();
-  });
+      if (debouncedQuery && !`${product.name} ${product.description} ${product.category} ${product.type}`.toLowerCase().includes(debouncedQuery)) {
+        return false;
+      }
+      return true;
+    });
+  }, [catalog, activeCategory, debouncedQuery]);
 
   // Sort logic (simplified)
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    if (sortBy === "price-low") return a.price - b.price;
-    if (sortBy === "price-high") return b.price - a.price;
-    return 0; // featured
-  });
+  const sortedProducts = useMemo(() => {
+    const copy = [...filteredProducts];
+    if (sortBy === "price-low") copy.sort((a, b) => a.pricePaise - b.pricePaise);
+    else if (sortBy === "price-high") copy.sort((a, b) => b.pricePaise - a.pricePaise);
+    return copy;
+  }, [filteredProducts, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedProducts.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedProducts = sortedProducts.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <div className="bg-timber-beige min-h-screen pt-10 pb-32">
@@ -1023,23 +70,23 @@ function ShopContent() {
         <ScrollReveal className="mb-12">
           <h1 className="font-serif text-4xl md:text-5xl text-timber-darkwood mb-4">The Collection</h1>
           <p className="text-timber-muted max-w-2xl">
-            Discover our entire range of premium handcrafted timber furniture. 
+            Discover our entire range of premium handcrafted timber furniture.
             Each piece is designed to bring warmth and elegance to your space.
           </p>
         </ScrollReveal>
 
         {/* Filters and Sorting */}
         <ScrollReveal className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6 border-b border-timber-darkwood/10 pb-6" delay={0.2}>
-          
+
           {/* Categories */}
           <div className="flex flex-wrap gap-2 md:gap-4">
             {CATEGORIES.map((category) => (
               <button
                 key={category}
-                onClick={() => setActiveCategory(category)}
+                onClick={() => { setActiveCategory(category); setPage(1); }}
                 className={`px-4 py-2 rounded-full text-sm tracking-wider transition-colors interactive ${
-                  activeCategory === category 
-                    ? "bg-timber-teal text-white" 
+                  activeCategory === category
+                    ? "bg-timber-teal text-white"
                     : "bg-transparent text-timber-darkwood border border-timber-darkwood/20 hover:border-timber-darkwood"
                 }`}
               >
@@ -1050,37 +97,87 @@ function ShopContent() {
 
           {/* Controls */}
           <div className="flex items-center gap-4 text-sm text-timber-darkwood">
+            <label className="flex items-center gap-2 border border-timber-darkwood/20 rounded-full px-3 py-1.5 bg-transparent focus-within:border-timber-teal transition-colors">
+              <Search size={16} className="text-timber-darkwood/60" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+                placeholder="Search products…"
+                aria-label="Search products"
+                className="bg-transparent outline-none text-sm w-36 md:w-44 placeholder:text-timber-darkwood/40"
+              />
+            </label>
             <button className="flex items-center gap-2 hover:text-timber-teal transition-colors interactive">
               <Filter size={16} />
               <span>Filters</span>
             </button>
-            
+
             <div className="relative group interactive cursor-pointer">
               <div className="flex items-center gap-2 hover:text-timber-teal transition-colors">
                 <span>Sort By: {sortBy === 'featured' ? 'Featured' : sortBy === 'price-low' ? 'Price: Low to High' : 'Price: High to Low'}</span>
                 <ChevronDown size={16} />
               </div>
               <div className="absolute top-full right-0 mt-2 w-48 bg-white shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 flex flex-col py-2">
-                <button onClick={() => setSortBy("featured")} className="text-left px-4 py-2 hover:bg-timber-beige transition-colors">Featured</button>
-                <button onClick={() => setSortBy("price-low")} className="text-left px-4 py-2 hover:bg-timber-beige transition-colors">Price: Low to High</button>
-                <button onClick={() => setSortBy("price-high")} className="text-left px-4 py-2 hover:bg-timber-beige transition-colors">Price: High to Low</button>
+                <button onClick={() => { setSortBy("featured"); setPage(1); }} className="text-left px-4 py-2 hover:bg-timber-beige transition-colors">Featured</button>
+                <button onClick={() => { setSortBy("price-low"); setPage(1); }} className="text-left px-4 py-2 hover:bg-timber-beige transition-colors">Price: Low to High</button>
+                <button onClick={() => { setSortBy("price-high"); setPage(1); }} className="text-left px-4 py-2 hover:bg-timber-beige transition-colors">Price: High to Low</button>
               </div>
             </div>
           </div>
         </ScrollReveal>
 
         {/* Grid */}
-        {sortedProducts.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-            {sortedProducts.map((product, index) => (
-              <ScrollReveal key={product.id} delay={0.1 * (index % 3)} direction="up">
-                <ProductCard product={product} />
-              </ScrollReveal>
-            ))}
+        {loading ? (
+          <div className="py-20 text-center" aria-live="polite">
+            <p className="text-timber-muted text-lg">Loading the collection…</p>
           </div>
+        ) : error ? (
+          <div className="py-20 text-center">
+            <p className="text-red-700 font-medium">Couldn&apos;t load products.</p>
+            <p className="text-timber-muted text-sm mt-2">{error}</p>
+          </div>
+        ) : pagedProducts.length > 0 ? (
+          <>
+            <p className="text-sm text-timber-muted mb-6" aria-live="polite">
+              Showing {(safePage - 1) * PAGE_SIZE + 1}–{(safePage - 1) * PAGE_SIZE + pagedProducts.length} of {sortedProducts.length} products
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+              {pagedProducts.map((product, index) => (
+                <ScrollReveal key={product.id} delay={0.1 * (index % 3)} direction="up">
+                  <ProductCard product={product} />
+                </ScrollReveal>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <nav className="mt-12 flex items-center justify-center gap-2" aria-label="Product pages">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  aria-label="Previous page"
+                  className="w-10 h-10 flex items-center justify-center border border-timber-darkwood/20 text-timber-darkwood hover:border-timber-teal hover:text-timber-teal transition-colors disabled:opacity-30 disabled:pointer-events-none interactive"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="text-sm text-timber-darkwood px-2" aria-live="polite">
+                  Page {safePage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  aria-label="Next page"
+                  className="w-10 h-10 flex items-center justify-center border border-timber-darkwood/20 text-timber-darkwood hover:border-timber-teal hover:text-timber-teal transition-colors disabled:opacity-30 disabled:pointer-events-none interactive"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </nav>
+            )}
+          </>
         ) : (
           <div className="py-20 text-center">
-            <p className="text-timber-muted text-lg">No products found in this category.</p>
+            <p className="text-timber-muted text-lg">No products found. Try a different search or category.</p>
           </div>
         )}
       </div>

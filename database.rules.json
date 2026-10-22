@@ -1,0 +1,30 @@
+{
+  "rules": {
+    // Products live under /projects (historical node name — see Phase 4 plan
+    // to migrate to /products with a paise-based schema).
+    // Public can read ACTIVE products; only admins can write anything.
+    "projects": {
+      ".read": true,
+      ".write": "auth != null && auth.token.admin === true",
+      ".indexOn": ["category", "isActive", "orderIndex"]
+    },
+    // Orders (created by the payment VM in Phase 5; rules prepared now so the
+    // shape is agreed before any order code is written):
+    // - a signed-in user may READ only their own orders (userId === uid)
+    // - clients may NEVER write orders directly — only the VM (Admin SDK
+    //   bypasses rules) creates them; admins may read/update all
+    "orders": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".indexOn": ["userId", "status"],
+      "$orderId": {
+        ".read": "auth != null && (auth.token.admin === true || data.child('userId').val() === auth.uid)",
+        ".write": "auth != null && auth.token.admin === true"
+      }
+    },
+    // Webhook idempotency keys (written by the VM only; clients get nothing).
+    "webhookEvents": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": "auth != null && auth.token.admin === true"
+    }
+  }
+}

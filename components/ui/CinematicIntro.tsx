@@ -58,13 +58,14 @@ function ParallaxImage({ img, i, phase, smoothMouseX, smoothMouseY, setIsHoverin
       onMouseLeave={() => setIsHoveringImage(false)}
     >
       <div className="relative w-[300px] h-[400px] md:w-[400px] md:h-[500px]">
+        {/* Not priority: these sit behind an overlay and must not contend
+            with the hero image for bandwidth on first paint. */}
         <Image
           src={img.src}
           alt={img.alt}
           fill
           className="object-cover"
           sizes="(max-width: 768px) 300px, 400px"
-          priority
         />
       </div>
     </motion.div>

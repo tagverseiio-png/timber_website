@@ -1,0 +1,20 @@
+{
+  "name": "timber-payment-vm",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Trusted payment backend (Razorpay + Firebase Admin SDK). Runs on the VM only — never on Vercel, never in the browser.",
+  "scripts": {
+    "start": "node src/index.js",
+    "set-admin": "node set-admin-claim.mjs",
+    "migrate-catalog": "node migrate-catalog-paise.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.4.1",
+    "firebase-admin": "^13.0.0",
+    "razorpay": "^2.9.6"
+  }
+}

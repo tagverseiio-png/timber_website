@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { ArrowRight, Globe, MessageCircle, Hash } from "lucide-react";
+import { Globe, MessageCircle, Hash } from "lucide-react";
 
 export function Footer() {
   return (
     <footer className="bg-timber-teal text-timber-beige pt-20 pb-10">
       <div className="container mx-auto px-6 md:px-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-16">
           {/* Brand */}
-          <div className="col-span-1 md:col-span-1">
+          <div className="col-span-1">
             <Link href="/" className="font-serif text-3xl tracking-wide font-bold mb-6 block text-white">
               TIMBER.
             </Link>
@@ -50,25 +50,6 @@ export function Footer() {
               <li><Link href="/care" className="hover:text-white transition-colors interactive">Wood Care Guide</Link></li>
               <li><Link href="/contact" className="hover:text-white transition-colors interactive">Contact Us</Link></li>
             </ul>
-          </div>
-
-          {/* Newsletter */}
-          <div>
-            <h4 className="font-serif text-lg text-white mb-6">Join Our Newsletter</h4>
-            <p className="text-timber-beige/80 mb-4 text-sm">
-              Subscribe for early access to new collections and exclusive offers.
-            </p>
-            <form className="flex border-b border-timber-beige/30 pb-2 relative group">
-              <input 
-                type="email" 
-                placeholder="Email Address" 
-                className="bg-transparent border-none outline-none text-white placeholder-timber-beige/50 w-full text-sm"
-                required
-              />
-              <button type="submit" aria-label="Subscribe" className="text-white group-hover:text-timber-beige transition-colors interactive">
-                <ArrowRight size={20} />
-              </button>
-            </form>
           </div>
         </div>
 
