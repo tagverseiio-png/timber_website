@@ -441,6 +441,22 @@ export default function AdminPanel() {
     }
   };
 
+  const clearAllProducts = async () => {
+    if (
+      !window.confirm(
+        "Are you sure you want to PERMANENTLY REMOVE ALL PRODUCTS from Firebase? This will delete all products from the database."
+      )
+    )
+      return;
+    try {
+      await remove(ref(database, "projects"));
+      setProducts([]);
+      notify("success", "All products have been permanently deleted from Firebase.");
+    } catch (error: unknown) {
+      notify("error", error instanceof Error ? error.message : "Failed to clear products.");
+    }
+  };
+
   const softDelete = async (p: CatalogProduct) => {
     if (!window.confirm(`Hide "${p.name}" from the storefront? (soft delete — reversible)`)) return;
     try {
@@ -584,17 +600,24 @@ export default function AdminPanel() {
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow-sm mb-8 border-l-4 border-timber-darkwood">
-          <h2 className="text-xl font-serif text-timber-darkwood mb-2">Migrate Storefront Data</h2>
+          <h2 className="text-xl font-serif text-timber-darkwood mb-2">Database Management</h2>
           <p className="text-gray-600 mb-4 text-sm max-w-2xl">
-            Push all hardcoded products from the backup into the database as canonical rows.
-            This overwrites everything under /projects — a confirmation is required.
+            Manage product records under <code>/projects</code> in Firebase Realtime Database.
           </p>
-          <button
-            onClick={pushSeeds}
-            className="px-6 py-2.5 bg-timber-darkwood text-timber-beige rounded-md hover:opacity-90 transition font-medium text-sm"
-          >
-            Push All Hardcoded Data to Database
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={clearAllProducts}
+              className="px-6 py-2.5 bg-red-700 text-white rounded-md hover:bg-red-800 transition font-medium text-sm"
+            >
+              Delete All Products from Firebase
+            </button>
+            <button
+              onClick={pushSeeds}
+              className="px-6 py-2.5 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 transition font-medium text-sm"
+            >
+              Restore All Products from Backup
+            </button>
+          </div>
         </div>
 
         <div className="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-col md:flex-row gap-3 md:items-center">
