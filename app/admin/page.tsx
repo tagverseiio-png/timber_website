@@ -8,12 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ref, set, push, onValue, remove, update, serverTimestamp } from "firebase/database";
-import {
-  ref as storageRef,
-  uploadBytesResumable,
-  getDownloadURL,
-} from "firebase/storage";
-import { auth, database, storage } from "@/lib/firebase";
+import { auth, database } from "@/lib/firebase";
 import {
   signInWithEmailAndPassword,
   signOut,
@@ -40,6 +35,18 @@ import { BOUTIQUE_PRODUCTS } from "@/lib/products/boutique_seed";
 const ADMIN_PAGE_SIZE = 12;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const ALLOWED_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+// ---------------------------------------------------------------------------
+// Base64 helper – converts a File or Blob to a data URI string
+// ---------------------------------------------------------------------------
+function fileToBase64(file: File | Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Minimal toast (no extra dependency)
@@ -108,7 +115,7 @@ function ProductModal({
     },
   });
 
-  const handleFile = (file: File | undefined) => {
+  const handleFile = async (file: File | undefined) => {
     if (!file) return;
     if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) {
       notify("error", "Only JPG, PNG or WebP images are allowed.");
@@ -118,28 +125,18 @@ function ProductModal({
       notify("error", "Image must be under 5 MB.");
       return;
     }
-    // Storage path is namespaced per product so re-uploads don't collide.
-    const key = initial?.id ?? `new_${Date.now()}`;
-    const path = `products/${key}/${Date.now()}_${file.name}`;
-    const task = uploadBytesResumable(storageRef(storage, path), file, {
-      contentType: file.type,
-    });
     setUploadPct(0);
-    task.on(
-      "state_changed",
-      (snap) => setUploadPct(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-      (err) => {
-        setUploadPct(null);
-        notify("error", `Upload failed: ${err.message}`);
-      },
-      async () => {
-        const url = await getDownloadURL(task.snapshot.ref);
-        setValue("image", url, { shouldValidate: true, shouldDirty: true });
-        setPreview(url);
-        setUploadPct(null);
-        notify("success", "Image uploaded to Storage.");
-      }
-    );
+    try {
+      setUploadPct(50);
+      const base64 = await fileToBase64(file);
+      setValue("image", base64, { shouldValidate: true, shouldDirty: true });
+      setPreview(base64);
+      setUploadPct(null);
+      notify("success", "Image converted — it will be saved with the product.");
+    } catch (err) {
+      setUploadPct(null);
+      notify("error", err instanceof Error ? err.message : "Image conversion failed.");
+    }
   };
 
   const onSubmit = async (raw: ProductFormInput) => {
@@ -270,7 +267,7 @@ function ProductModal({
                 <div className="relative w-16 h-16 bg-gray-100 rounded border overflow-hidden">
                   <Image src={preview} alt="Preview" fill className="object-cover" unoptimized={preview.startsWith("data:")} />
                 </div>
-                <p className="text-xs text-green-600">Image ready to save (stored in Firebase Storage).</p>
+                <p className="text-xs text-green-600">Image ready to save (stored as base64).</p>
               </div>
             )}
             {errors.image && <p className={errCls}>{errors.image.message}</p>}
@@ -463,7 +460,7 @@ export default function AdminPanel() {
   const uploadBoutiqueProducts = async () => {
     if (
       !window.confirm(
-        "Upload all 16 boutique products with images to Firebase Storage & Database? This replaces /projects."
+        "Upload all 16 boutique products with base64 images to Firebase Database? This replaces /projects."
       )
     )
       return;
@@ -475,27 +472,17 @@ export default function AdminPanel() {
         const curr = BOUTIQUE_PRODUCTS[i];
         setUploadProgress({ current: i + 1, total, name: curr.name });
 
-        let imageUrl = curr.image;
+        let imageData = curr.image;
 
-        // Upload the local image to Firebase Storage
+        // Convert the local image to base64 data URI
         try {
           const resp = await fetch(curr.image);
           if (resp.ok) {
             const blob = await resp.blob();
-            const ext = curr.image.split(".").pop()?.toLowerCase() || "jpeg";
-            const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
-            const path = `products/${curr.id}/${curr.slug}.${ext}`;
-            const sRef = storageRef(storage, path);
-            const task = uploadBytesResumable(sRef, blob, { contentType });
-
-            // Wait for upload to complete
-            await new Promise<void>((resolve, reject) => {
-              task.on("state_changed", null, reject, () => resolve());
-            });
-            imageUrl = await getDownloadURL(task.snapshot.ref);
+            imageData = await fileToBase64(blob as File);
           }
         } catch (imgErr) {
-          console.warn(`Image upload failed for ${curr.name}, using local path`, imgErr);
+          console.warn(`Image conversion failed for ${curr.name}, using local path`, imgErr);
         }
 
         projectsObject[curr.id] = {
@@ -506,7 +493,7 @@ export default function AdminPanel() {
           currency: "INR",
           stock: curr.stock,
           description: curr.description,
-          images: [imageUrl],
+          images: [imageData],
           type: curr.type,
           orderIndex: curr.orderIndex,
           isActive: true,
@@ -517,7 +504,7 @@ export default function AdminPanel() {
 
       await set(ref(database, "projects"), projectsObject);
       setUploadProgress(null);
-      notify("success", `All ${total} boutique products uploaded with images to Firebase!`);
+      notify("success", `All ${total} boutique products uploaded as base64 to Firebase!`);
     } catch (error: unknown) {
       setUploadProgress(null);
       notify("error", error instanceof Error ? error.message : "Upload failed.");
@@ -653,7 +640,7 @@ export default function AdminPanel() {
         <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-lg shadow-sm">
           <div>
             <h1 className="font-serif text-3xl text-timber-darkwood">Product Management</h1>
-            <p className="text-gray-500 text-sm mt-1">Firebase Realtime Database · admin-only writes · prices in paise</p>
+            <p className="text-gray-500 text-sm mt-1">Firebase Realtime Database · admin-only writes · images as base64 · prices in paise</p>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium text-gray-700">{user.email}</span>
@@ -677,7 +664,7 @@ export default function AdminPanel() {
               disabled={!!uploadProgress}
               className="px-6 py-2.5 bg-timber-teal text-white rounded-md hover:bg-timber-darkwood transition font-medium text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {uploadProgress ? `Uploading ${uploadProgress.current}/${uploadProgress.total}…` : "Upload 16 Products to Storage"}
+              {uploadProgress ? `Converting ${uploadProgress.current}/${uploadProgress.total}…` : "Upload 16 Products (base64)"}
             </button>
             <button
               onClick={clearAllProducts}

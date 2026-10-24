@@ -49,7 +49,7 @@ export default function CartPage() {
                   <div key={line.id} className="bg-white p-4 rounded flex gap-4 items-center">
                     <div className="relative w-20 h-20 bg-timber-cream rounded overflow-hidden flex-shrink-0">
                       {product.images[0] && (
-                        <Image src={product.images[0]} alt={product.name} fill className="object-cover" />
+                        <Image src={product.images[0]} alt={product.name} fill className="object-cover" unoptimized={product.images[0].startsWith("data:")} />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">

@@ -55,6 +55,7 @@ export function ProductDetailView({ product }: { product: CatalogProduct }) {
                   fill
                   className="object-cover"
                   priority
+                  unoptimized={gallery[activeImage].startsWith("data:")}
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-timber-muted">
@@ -71,7 +72,7 @@ export function ProductDetailView({ product }: { product: CatalogProduct }) {
                     aria-label={`View image ${index + 1} of ${product.name}`}
                     className={`relative w-24 h-24 flex-shrink-0 rounded-sm overflow-hidden ${activeImage === index ? 'ring-2 ring-timber-teal' : 'opacity-70 hover:opacity-100 transition-opacity'} interactive`}
                   >
-                    <Image src={img} alt={`${product.name} — view ${index + 1}`} fill className="object-cover" />
+                    <Image src={img} alt={`${product.name} — view ${index + 1}`} fill className="object-cover" unoptimized={img.startsWith("data:")} />
                   </button>
                 ))}
               </div>
