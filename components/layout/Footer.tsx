@@ -56,6 +56,7 @@ export function Footer() {
         {/* Bottom */}
         <div className="pt-8 border-t border-timber-beige/10 flex flex-col md:flex-row justify-between items-center text-xs text-timber-beige/60">
           <p>&copy; {new Date().getFullYear()} Timber Furniture Co. All rights reserved.</p>
+          <p className="mt-4 md:mt-0 text-timber-beige/50">Created by <span className="text-timber-beige/80 font-medium">Tagverse</span></p>
           <div className="flex space-x-6 mt-4 md:mt-0">
             <Link href="/privacy" className="hover:text-white transition-colors interactive">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-white transition-colors interactive">Terms of Service</Link>
