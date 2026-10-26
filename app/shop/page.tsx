@@ -1,17 +1,23 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
-import { ArrowRight, Hammer, Search, ShoppingBag } from "lucide-react";
+import { ArrowRight, Check, Hammer, Search, ShoppingBag, ShoppingCart, Zap } from "lucide-react";
 import { useCatalog } from "@/lib/products/catalog";
+import { useCartStore } from "@/store/useCartStore";
 import { formatPrice } from "@/lib/money";
 
 export default function ShopPage() {
+  const router = useRouter();
   const { products, loading } = useCatalog();
+  const add = useCartStore((s) => s.add);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [query, setQuery] = useState("");
+  // Track which product IDs just got added (for brief "Added ✓" feedback)
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
   const categories = useMemo(() => {
     const cats = new Set(products.map((p) => p.category).filter(Boolean));
@@ -26,6 +32,30 @@ export default function ShopPage() {
       return true;
     });
   }, [products, selectedCategory, query]);
+
+  const handleAddToCart = useCallback(
+    (productId: string, stock: number | null) => {
+      add(productId, 1, stock);
+      setAddedIds((prev) => new Set(prev).add(productId));
+      // Reset the "Added ✓" feedback after 1.5s
+      setTimeout(() => {
+        setAddedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+      }, 1500);
+    },
+    [add]
+  );
+
+  const handleBuyNow = useCallback(
+    (productId: string, stock: number | null) => {
+      add(productId, 1, stock);
+      router.push("/cart");
+    },
+    [add, router]
+  );
 
   return (
     <div className="bg-timber-beige min-h-screen pt-12 pb-32">
@@ -85,6 +115,7 @@ export default function ShopPage() {
                   <div className="h-4 bg-timber-darkwood/10 rounded w-3/4" />
                   <div className="h-3 bg-timber-darkwood/5 rounded w-1/2" />
                   <div className="h-5 bg-timber-darkwood/10 rounded w-1/3" />
+                  <div className="h-10 bg-timber-darkwood/5 rounded w-full mt-2" />
                 </div>
               </div>
             ))}
@@ -94,56 +125,108 @@ export default function ShopPage() {
         {/* Product Grid */}
         {!loading && filtered.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-16">
-            {filtered.map((product, index) => (
-              <ScrollReveal key={product.id} delay={Math.min(index * 0.05, 0.4)} direction="up">
-                <div className="group bg-white/70 backdrop-blur-sm border border-timber-darkwood/8 rounded-2xl overflow-hidden hover:shadow-lg hover:border-timber-teal/30 transition-all duration-300 h-full flex flex-col">
-                  {/* Image */}
-                  <div className="relative aspect-square bg-timber-beige overflow-hidden">
-                    {product.images[0] ? (
-                      <Image
-                        src={product.images[0]}
-                        alt={product.name}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-500"
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                        unoptimized={product.images[0].startsWith("data:")}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <ShoppingBag size={48} className="text-timber-darkwood/15" />
-                      </div>
-                    )}
-                    {/* Category badge */}
-                    <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-timber-darkwood text-[10px] uppercase tracking-wider font-medium px-3 py-1 rounded-full">
-                      {product.category}
-                    </span>
-                  </div>
+            {filtered.map((product, index) => {
+              const soldOut = product.stock === 0;
+              const justAdded = addedIds.has(product.id);
 
-                  {/* Details */}
-                  <div className="p-5 flex flex-col flex-1">
-                    <p className="text-[10px] uppercase tracking-widest text-timber-teal font-medium mb-1">
-                      {product.type}
-                    </p>
-                    <h3 className="font-serif text-lg text-timber-darkwood mb-2 leading-snug group-hover:text-timber-teal transition-colors">
-                      {product.name}
-                    </h3>
-                    <p className="text-timber-muted text-xs leading-relaxed line-clamp-2 mb-4 flex-1">
-                      {product.description}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <span className="font-serif text-xl text-timber-darkwood font-medium">
-                        {formatPrice(product.pricePaise, product.currency)}
-                      </span>
-                      {product.stock !== null && product.stock <= 5 && product.stock > 0 && (
-                        <span className="text-[10px] uppercase tracking-wider font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                          Only {product.stock} left
+              return (
+                <ScrollReveal key={product.id} delay={Math.min(index * 0.05, 0.4)} direction="up">
+                  <div className="group bg-white/70 backdrop-blur-sm border border-timber-darkwood/8 rounded-2xl overflow-hidden hover:shadow-lg hover:border-timber-teal/30 transition-all duration-300 h-full flex flex-col">
+                    {/* Image */}
+                    <Link href={`/shop/${product.id}`} className="block">
+                      <div className="relative aspect-square bg-timber-beige overflow-hidden">
+                        {product.images[0] ? (
+                          <Image
+                            src={product.images[0]}
+                            alt={product.name}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-500"
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                            unoptimized={product.images[0].startsWith("data:")}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <ShoppingBag size={48} className="text-timber-darkwood/15" />
+                          </div>
+                        )}
+                        {/* Category badge */}
+                        <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-timber-darkwood text-[10px] uppercase tracking-wider font-medium px-3 py-1 rounded-full">
+                          {product.category}
                         </span>
-                      )}
+                        {/* Out of stock overlay */}
+                        {soldOut && (
+                          <div className="absolute inset-0 bg-timber-darkwood/30 flex items-center justify-center">
+                            <span className="bg-timber-darkwood text-timber-beige text-xs uppercase font-bold tracking-wider px-4 py-2 rounded-full">
+                              Out of Stock
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+
+                    {/* Details */}
+                    <div className="p-5 flex flex-col flex-1">
+                      <p className="text-[10px] uppercase tracking-widest text-timber-teal font-medium mb-1">
+                        {product.type}
+                      </p>
+                      <Link href={`/shop/${product.id}`}>
+                        <h3 className="font-serif text-lg text-timber-darkwood mb-2 leading-snug group-hover:text-timber-teal transition-colors">
+                          {product.name}
+                        </h3>
+                      </Link>
+                      <p className="text-timber-muted text-xs leading-relaxed line-clamp-2 mb-4 flex-1">
+                        {product.description}
+                      </p>
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="font-serif text-xl text-timber-darkwood font-medium">
+                          {formatPrice(product.pricePaise, product.currency)}
+                        </span>
+                        {product.stock !== null && product.stock <= 5 && product.stock > 0 && (
+                          <span className="text-[10px] uppercase tracking-wider font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                            Only {product.stock} left
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 mt-auto">
+                        <button
+                          id={`add-to-cart-${product.id}`}
+                          disabled={soldOut}
+                          onClick={() => handleAddToCart(product.id, product.stock)}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed ${
+                            justAdded
+                              ? "bg-emerald-600 text-white scale-[1.02]"
+                              : "bg-timber-darkwood/5 text-timber-darkwood border border-timber-darkwood/12 hover:bg-timber-teal hover:text-white hover:border-timber-teal hover:shadow-md"
+                          }`}
+                        >
+                          {justAdded ? (
+                            <>
+                              <Check size={14} strokeWidth={3} />
+                              <span>Added</span>
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingCart size={14} />
+                              <span>Add to Cart</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          id={`buy-now-${product.id}`}
+                          disabled={soldOut}
+                          onClick={() => handleBuyNow(product.id, product.stock)}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider bg-timber-teal text-white hover:bg-timber-darkwood hover:shadow-md transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <Zap size={14} />
+                          <span>Buy Now</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </ScrollReveal>
-            ))}
+                </ScrollReveal>
+              );
+            })}
           </div>
         )}
 
@@ -198,3 +281,4 @@ export default function ShopPage() {
     </div>
   );
 }
+
