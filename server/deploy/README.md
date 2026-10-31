@@ -87,7 +87,7 @@ Dashboard → Settings → Webhooks → **New webhook**:
 
 Shiprocket panel → Settings → Webhooks:
 
-- URL: `https://pay.yourdomain.com/webhooks/shiprocket`
+- URL: `https://pay.yourdomain.com/webhooks/carrier` (no "shiprocket"-like words — their panel forbids them)
 - Basic auth: set the same `user:pass` you put in `SHIPROCKET_WEBHOOK_BASIC`.
 
 ## 8. Point the storefront at the VM

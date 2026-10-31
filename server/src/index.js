@@ -35,9 +35,11 @@ app.get("/healthz", (_, res) => res.json({ ok: true }));
 // or signature verification breaks.
 app.post("/webhooks/razorpay", express.raw({ type: "application/json", limit: "1mb" }), razorpayWebhook);
 
-// Shiprocket webhooks have no signatures; the raw body is parsed later and
+// Carrier webhooks have no signatures; the raw body is parsed later and
 // needs no JSON middleware — parse inside the handler (body as Buffer).
-app.post("/webhooks/shiprocket", express.raw({ type: "application/json", limit: "512kb" }), shiprocketWebhook);
+// Path deliberately avoids the words Shiprocket forbids in webhook URLs
+// (shiprocket/sr/kr/kartrocket): it's just the courier provider callback.
+app.post("/webhooks/carrier", express.raw({ type: "application/json", limit: "512kb" }), shiprocketWebhook);
 
 app.use(express.json({ limit: "100kb" }));
 
