@@ -39,7 +39,7 @@ export const env = {
   },
   siteUrl: optional("NEXT_PUBLIC_SITE_URL", "http://localhost:3000"),
   currency: optional("NEXT_PUBLIC_CURRENCY", "INR"),
-  razorpayKeyId: optional("NEXT_PUBLIC_RAZORPAY_KEY_ID"),
+  razorpayKeyId: optional("NEXT_PUBLIC_RAZORPAY_KEY_ID", "rzp_live_TtAJiKuy9j7ZEb"),
   /** VM base URL, e.g. https://pay.example.com — required for checkout. */
   paymentApiUrl: optional("NEXT_PUBLIC_PAYMENT_API_URL"),
 } as const;

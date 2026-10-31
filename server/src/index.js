@@ -1,9 +1,12 @@
+import "dotenv/config"; // load server/.env BEFORE any config access
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { config } from "./config.js";
 import { createOrder, verifyPayment } from "./orders.js";
 import { razorpayWebhook } from "./webhooks.js";
+import { fulfill, shippingQuote, shiprocketWebhook } from "./shiprocket.js";
+import { refundOrder } from "./refunds.js";
 
 const app = express();
 
@@ -32,6 +35,10 @@ app.get("/healthz", (_, res) => res.json({ ok: true }));
 // or signature verification breaks.
 app.post("/webhooks/razorpay", express.raw({ type: "application/json", limit: "1mb" }), razorpayWebhook);
 
+// Shiprocket webhooks have no signatures; the raw body is parsed later and
+// needs no JSON middleware — parse inside the handler (body as Buffer).
+app.post("/webhooks/shiprocket", express.raw({ type: "application/json", limit: "512kb" }), shiprocketWebhook);
+
 app.use(express.json({ limit: "100kb" }));
 
 const paymentLimiter = rateLimit({
@@ -43,6 +50,9 @@ const paymentLimiter = rateLimit({
 
 app.post("/create-order", paymentLimiter, createOrder);
 app.post("/verify-payment", paymentLimiter, verifyPayment);
+app.post("/shipping/quote", paymentLimiter, shippingQuote);
+app.post("/fulfill", paymentLimiter, fulfill);
+app.post("/refund", paymentLimiter, refundOrder);
 
 // JSON error envelope (never leaks stack traces or secrets).
 // eslint-disable-next-line no-unused-vars

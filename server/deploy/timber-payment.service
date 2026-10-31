@@ -1,0 +1,31 @@
+[Unit]
+Description=Timber payment VM (Razorpay + Shiprocket + Firebase Admin)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Deployment layout: /opt/timber-payment (repo server/ contents, incl. .env)
+WorkingDirectory=/opt/timber-payment
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=3
+# Node binds :8080 on localhost only — Caddy is the only public face.
+Environment=NODE_ENV=production
+Environment=PORT=8080
+
+# Hardening: no root, no writing outside the app dir, minimal capabilities.
+User=timber
+Group=timber
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/timber-payment
+
+# Crash > 5 times in 60s => stop hammering (protects secrets from retry storms).
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

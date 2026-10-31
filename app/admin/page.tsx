@@ -7,7 +7,18 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ref, set, push, onValue, remove, update, serverTimestamp } from "firebase/database";
+import {
+  ref,
+  set,
+  push,
+  onValue,
+  remove,
+  update,
+  serverTimestamp,
+  query,
+  orderByChild,
+  limitToLast,
+} from "firebase/database";
 import { auth, database } from "@/lib/firebase";
 import {
   signInWithEmailAndPassword,
@@ -16,6 +27,8 @@ import {
   type User,
 } from "firebase/auth";
 import { hasAdminClaim } from "@/lib/auth/admin";
+import { env } from "@/lib/env";
+import { postToPaymentApi } from "@/lib/razorpay";
 import {
   productSchema,
   PRODUCT_CATEGORIES,
@@ -110,6 +123,10 @@ function ProductModal({
       description: initial?.description ?? "",
       image: initial?.images[0] ?? "",
       stock: initial?.stock != null ? String(initial.stock) : "",
+      weightGrams: initial?.weightGrams != null ? String(initial.weightGrams) : "",
+      lengthCm: initial?.lengthCm != null ? String(initial.lengthCm) : "",
+      widthCm: initial?.widthCm != null ? String(initial.widthCm) : "",
+      heightCm: initial?.heightCm != null ? String(initial.heightCm) : "",
       orderIndex: initial?.orderIndex ?? fallbackOrderIndex,
       isActive: initial?.isActive ?? true,
     },
@@ -147,6 +164,17 @@ function ProductModal({
       setError("stock", { message: "Whole units, or leave empty" });
       return;
     }
+    // Parcel spec: blank = unset (VM falls back to its default weight).
+    const parcel = (v: string) => {
+      const n = parseInt(v, 10);
+      return Number.isInteger(n) && n > 0 ? n : null;
+    };
+    const parcelSpec = {
+      weightGrams: parcel(values.weightGrams),
+      lengthCm: parcel(values.lengthCm),
+      widthCm: parcel(values.widthCm),
+      heightCm: parcel(values.heightCm),
+    };
     // set() replaces the whole row: legacy v1 keys (title/price/image) are
     // dropped and the row becomes canonical on save (implicit migration).
     // Timestamps come from the Firebase server (multi-admin clock safety).
@@ -160,6 +188,11 @@ function ProductModal({
         : {}),
       currency: "INR",
       stock,
+      // Omitted when unset — keeps the stored shape minimal.
+      ...(parcelSpec.weightGrams != null ? { weightGrams: parcelSpec.weightGrams } : {}),
+      ...(parcelSpec.lengthCm != null ? { lengthCm: parcelSpec.lengthCm } : {}),
+      ...(parcelSpec.widthCm != null ? { widthCm: parcelSpec.widthCm } : {}),
+      ...(parcelSpec.heightCm != null ? { heightCm: parcelSpec.heightCm } : {}),
       images: values.image ? [values.image] : [],
       category: values.category,
       type: values.type,
@@ -223,6 +256,35 @@ function ProductModal({
               <input type="text" inputMode="numeric" placeholder="e.g. 10" {...register("stock")} className={inputCls} />
               {errors.stock && <p className={errCls}>{errors.stock.message}</p>}
             </div>
+          </div>
+
+          <div className="pt-2 border-t border-gray-100">
+            <p className="text-sm font-medium text-gray-700 mb-3">Shipping parcel (Shiprocket)</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Weight (g) *</label>
+                <input type="text" inputMode="numeric" placeholder="e.g. 2500" {...register("weightGrams")} className={inputCls} />
+                {errors.weightGrams && <p className={errCls}>{errors.weightGrams.message}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Length (cm)</label>
+                <input type="text" inputMode="numeric" placeholder="e.g. 90" {...register("lengthCm")} className={inputCls} />
+                {errors.lengthCm && <p className={errCls}>{errors.lengthCm.message}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Width (cm)</label>
+                <input type="text" inputMode="numeric" placeholder="e.g. 60" {...register("widthCm")} className={inputCls} />
+                {errors.widthCm && <p className={errCls}>{errors.widthCm.message}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Height (cm)</label>
+                <input type="text" inputMode="numeric" placeholder="e.g. 40" {...register("heightCm")} className={inputCls} />
+                {errors.heightCm && <p className={errCls}>{errors.heightCm.message}</p>}
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Weight is required to ship. If left empty here, the VM default weight (SHIPROCKET_DEFAULT_WEIGHT_G) is used.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -303,6 +365,253 @@ function ProductModal({
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Orders panel (semi-auto fulfillment): latest 50 live orders with
+// "Approve & Ship" → POST /fulfill on the payment VM (creates Shiprocket
+// shipment + AWB). Statuses then advance via the Shiprocket webhook.
+// ---------------------------------------------------------------------------
+interface OrderRow {
+  id: string;
+  status: string;
+  amountPaise: number;
+  currency: string;
+  items?: { id: string; name: string; qty: number; pricePaise: number }[];
+  customer?: { name?: string; email?: string; phone?: string };
+  address?: { line1?: string; line2?: string; city?: string; state?: string; pincode?: string };
+  shiprocket?: {
+    orderId?: string;
+    shipmentId?: string;
+    awb?: string;
+    courierName?: string;
+    state?: string;
+    createdAt?: number;
+  };
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+const ORDER_STATUS_STYLES: Record<string, string> = {
+  pending: "bg-gray-100 text-gray-700",
+  paid: "bg-green-100 text-green-800",
+  processing: "bg-blue-100 text-blue-800",
+  shipped: "bg-indigo-100 text-indigo-800",
+  out_for_delivery: "bg-indigo-100 text-indigo-800",
+  delivered: "bg-emerald-100 text-emerald-800",
+  failed: "bg-red-100 text-red-700",
+  refunded: "bg-yellow-100 text-yellow-800",
+  rto: "bg-orange-100 text-orange-800",
+};
+
+function statusLabel(s: string): string {
+  return s.replace(/_/g, " ").toUpperCase();
+}
+
+function OrdersSection({ notify, user }: { notify: (kind: "success" | "error", msg: string) => void; user: User | null }) {
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [listError, setListError] = useState<string | null>(null);
+  const [actingOn, setActingOn] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const ordersQuery = query(
+      ref(database, "orders"),
+      orderByChild("createdAt"),
+      limitToLast(50)
+    );
+    const unsub = onValue(
+      ordersQuery,
+      (snap) => {
+        const data = (snap.val() ?? {}) as Record<string, Omit<OrderRow, "id">>;
+        const rows = Object.entries(data)
+          .map(([id, o]) => ({ id, ...o }) as OrderRow)
+          .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+        setOrders(rows);
+        setListError(null);
+      },
+      (err) => setListError(err.message)
+    );
+    return () => unsub();
+  }, [user]);
+
+  /** Semi-auto: admin reviews a paid order → confirms → VM creates the shipment. */
+  const approveAndShip = async (o: OrderRow) => {
+    if (
+      !window.confirm(
+        `Send order ${o.id} to Shiprocket?\n${o.customer?.name ?? ""} → ${o.address?.city ?? ""}, ${
+          o.address?.pincode ?? ""
+        }\nThis assigns a courier and AWB.`
+      )
+    )
+      return;
+    if (!user) return;
+    setActingOn(o.id);
+    try {
+      const idToken = await user.getIdToken();
+      const result = await postToPaymentApi<{ ok: boolean; already?: boolean; awb?: string; courier?: string }>(
+        "/fulfill",
+        { orderId: o.id },
+        idToken
+      );
+      notify(
+        "success",
+        result.already
+          ? "Order was already sent to Shiprocket."
+          : `Shipment created${result.awb ? ` — AWB ${result.awb} (${result.courier})` : " — AWB pending"}.`
+      );
+    } catch (err) {
+      notify("error", err instanceof Error ? err.message : "Fulfillment failed.");
+    } finally {
+      setActingOn(null);
+    }
+  };
+
+  /** Admin refund: full amount, best-effort cancels the Shiprocket shipment. */
+  const refund = async (o: OrderRow) => {
+    if (!window.confirm(`Refund order ${o.id} for the full amount?`)) return;
+    if (!user) return;
+    setActingOn(o.id);
+    try {
+      const idToken = await user.getIdToken();
+      const result = await postToPaymentApi<{ ok: boolean; already?: boolean; refundId?: string }>(
+        "/refund",
+        { orderId: o.id },
+        idToken
+      );
+      notify("success", result.already ? "Order was already refunded." : `Refund created (${result.refundId}).`);
+    } catch (err) {
+      notify("error", err instanceof Error ? err.message : "Refund failed.");
+    } finally {
+      setActingOn(null);
+    }
+  };
+
+  const fmtDate = (ms?: number) =>
+    ms ? new Date(ms).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—";
+
+  if (!env.paymentApiUrl) {
+    return (
+      <div className="bg-white p-6 rounded-lg shadow-sm mb-8 border-l-4 border-yellow-500">
+        <h2 className="text-xl font-serif text-timber-darkwood mb-2">Orders</h2>
+        <p className="text-gray-600 text-sm">
+          Set <code>NEXT_PUBLIC_PAYMENT_API_URL</code> (and the corresponding Vercel env var) once the payment
+          VM is live — shipping actions need it.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
+      <div className="p-6 border-b border-gray-100">
+        <h2 className="text-xl font-serif text-timber-darkwood">Recent Orders (latest 50)</h2>
+        <p className="text-gray-500 text-sm mt-1">
+          Paid orders need your review, then <em>Approve &amp; Ship</em> hands them to Shiprocket (semi-auto mode).
+        </p>
+      </div>
+      {listError ? (
+        <div className="p-6">
+          <p className="text-red-600 font-medium mb-1">Couldn&apos;t load orders</p>
+          <p className="text-gray-500 text-sm">{listError}</p>
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="p-12 text-center text-gray-500 italic">No orders yet.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Order</th>
+                <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Customer</th>
+                <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Address</th>
+                <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Amount</th>
+                <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Status</th>
+                <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Shiprocket</th>
+                <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {orders.map((o) => (
+                <tr key={o.id} className="hover:bg-gray-50/50 transition align-top">
+                  <td className="py-4 px-6">
+                    <div className="font-mono text-xs text-gray-900 break-all">{o.id}</div>
+                    <div className="text-xs text-gray-500 mt-1">{fmtDate(o.createdAt)}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {(o.items ?? []).map((i) => `${i.name}×${i.qty}`).join(", ")}
+                    </div>
+                  </td>
+                  <td className="py-4 px-6 text-sm text-gray-900">
+                    <div>{o.customer?.name}</div>
+                    <div className="text-xs text-gray-500">{o.customer?.phone}</div>
+                    {o.customer?.email && <div className="text-xs text-gray-500">{o.customer.email}</div>}
+                  </td>
+                  <td className="py-4 px-6 text-xs text-gray-700 max-w-xs">
+                    {[o.address?.line1, o.address?.line2, o.address?.city, o.address?.state, o.address?.pincode]
+                      .filter(Boolean)
+                      .join(", ")}
+                  </td>
+                  <td className="py-4 px-6 font-medium text-gray-900 whitespace-nowrap">
+                    {formatPrice(o.amountPaise, o.currency ?? "INR")}
+                  </td>
+                  <td className="py-4 px-6">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                        ORDER_STATUS_STYLES[o.status] ?? "bg-gray-100 text-gray-700"
+                      }`}
+                    >
+                      {statusLabel(o.status ?? "pending")}
+                    </span>
+                  </td>
+                  <td className="py-4 px-6 text-xs text-gray-700">
+                    {o.shiprocket?.orderId ? (
+                      <div>
+                        <div>SR #{o.shiprocket.orderId}</div>
+                        <div className="mt-1">
+                          {o.shiprocket.awb
+                            ? `AWB ${o.shiprocket.awb}${o.shiprocket.courierName ? ` · ${o.shiprocket.courierName}` : ""}`
+                            : "AWB pending"}
+                        </div>
+                        {o.shiprocket.state && (
+                          <div className="mt-1 text-gray-500">{statusLabel(o.shiprocket.state)}</div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="py-4 px-6 text-right whitespace-nowrap">
+                    {o.status === "paid" ? (
+                      <button
+                        onClick={() => approveAndShip(o)}
+                        disabled={actingOn === o.id}
+                        className="text-white bg-timber-teal hover:bg-timber-darkwood px-4 py-2 rounded-md text-sm font-medium transition disabled:opacity-50 mr-3"
+                      >
+                        {actingOn === o.id ? "Shipping…" : "Approve & Ship"}
+                      </button>
+                    ) : o.status === "processing" && !o.shiprocket?.awb ? (
+                      <span className="text-xs text-gray-500 mr-3">AWB assignment pending</span>
+                    ) : (
+                      <span className="text-xs text-gray-400 mr-3">—</span>
+                    )}
+                    {["paid", "processing", "shipped", "out_for_delivery", "rto"].includes(o.status) && (
+                      <button
+                        onClick={() => refund(o)}
+                        disabled={actingOn === o.id}
+                        className="text-red-600 hover:text-red-900 text-sm font-medium disabled:opacity-50"
+                      >
+                        {actingOn === o.id ? "Refunding…" : "Refund"}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -700,6 +1009,8 @@ export default function AdminPanel() {
             </div>
           )}
         </div>
+
+        <OrdersSection notify={notify} user={user} />
 
         <div className="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-col md:flex-row gap-3 md:items-center">
           <input

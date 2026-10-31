@@ -35,6 +35,11 @@ export interface CatalogProduct {
   type: string;
   isActive: boolean;
   orderIndex: number;
+  /** Parcel spec for Shiprocket (grams / cm). Unset on legacy rows. */
+  weightGrams?: number;
+  lengthCm?: number;
+  widthCm?: number;
+  heightCm?: number;
   createdAt?: number;
   updatedAt?: number;
 }
@@ -59,6 +64,12 @@ function asString(v: unknown, fallback = ""): string {
 function asInt(v: unknown, fallback: number): number {
   const n = Number(v);
   return Number.isInteger(n) ? n : fallback;
+}
+
+/** Positive integer or undefined — for optional parcel-spec fields. */
+function asPosInt(v: unknown): number | undefined {
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : undefined;
 }
 
 /** Normalize one RTDB row (v1 legacy or v2 canonical) into CatalogProduct. */
@@ -103,6 +114,10 @@ export function toCatalogProduct(key: string, raw: RawProductRow): CatalogProduc
     type: asString(raw.type),
     isActive: raw.isActive !== false, // legacy rows predate soft-delete
     orderIndex: asInt(raw.orderIndex, 0),
+    ...(asPosInt(raw.weightGrams) != null ? { weightGrams: asPosInt(raw.weightGrams) } : {}),
+    ...(asPosInt(raw.lengthCm) != null ? { lengthCm: asPosInt(raw.lengthCm) } : {}),
+    ...(asPosInt(raw.widthCm) != null ? { widthCm: asPosInt(raw.widthCm) } : {}),
+    ...(asPosInt(raw.heightCm) != null ? { heightCm: asPosInt(raw.heightCm) } : {}),
     ...(typeof raw.createdAt === "number" ? { createdAt: raw.createdAt } : {}),
     ...(typeof raw.updatedAt === "number" ? { updatedAt: raw.updatedAt } : {}),
   };

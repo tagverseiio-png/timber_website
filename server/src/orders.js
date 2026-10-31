@@ -50,14 +50,18 @@ function validateItems(body) {
 }
 
 /**
- * POST /create-order — body {items:[{id,qty}]} ONLY. Prices are re-read from
- * RTDB with the Admin SDK and the total is computed here. The client amount
- * is NEVER trusted.
+ * POST /create-order — body {items:[{id,qty}], customer, address} ONLY.
+ * Prices are re-read from RTDB with the Admin SDK and the total is computed
+ * here. The client amount is NEVER trusted. Customer + address are validated
+ * on the VM (never trust the browser) and snapshotted onto the order so
+ * fulfillment has everything it needs even if the client changes later.
  */
 export async function createOrder(req, res, next) {
   try {
     const userId = await requireUserId(req);
     const lines = validateItems(req.body);
+    const customer = validateCustomer(req.body?.customer);
+    const address = validateAddress(req.body?.address);
 
     const snap = await db.ref("projects").get();
     const catalog = snap.val() ?? {};
@@ -80,7 +84,18 @@ export async function createOrder(req, res, next) {
         throw err;
       }
       amountPaise += pricePaise * qty; // integer math only
-      orderItems.push({ id, name, qty, pricePaise });
+      orderItems.push({
+        id,
+        name,
+        qty,
+        pricePaise,
+        // Parcel specs for Shiprocket — snapshotted from the catalog at
+        // order time so later catalog edits never mutate a paid order.
+        weightGrams: row.weightGrams == null ? null : Number(row.weightGrams),
+        lengthCm: row.lengthCm == null ? null : Number(row.lengthCm),
+        widthCm: row.widthCm == null ? null : Number(row.widthCm),
+        heightCm: row.heightCm == null ? null : Number(row.heightCm),
+      });
     }
     if (amountPaise < 100) {
       // Razorpay minimum is ₹1.00.
@@ -98,10 +113,13 @@ export async function createOrder(req, res, next) {
     const now = Date.now();
     await db.ref(`orders/${rzOrder.id}`).set({
       id: rzOrder.id,
-      status: "pending",
+      receipt: rzOrder.receipt,
+      status: "pending", // → paid → processing → shipped → out_for_delivery → delivered (failed/refunded/rto wrong-way states)
       items: orderItems,
       amountPaise,
       currency: config.currency,
+      customer,
+      address,
       userId,
       createdAt: now,
       updatedAt: now,
@@ -115,6 +133,89 @@ export async function createOrder(req, res, next) {
     });
   } catch (err) {
     next(err);
+  }
+}
+
+function requireText(obj, key, min, max, label) {
+  const value = typeof obj?.[key] === "string" ? obj[key].trim() : "";
+  if (value.length < min || value.length > max) {
+    const err = new Error(`${label}: need ${min}–${max} characters.`);
+    err.status = 400;
+    throw err;
+  }
+  return value;
+}
+
+function optionalText(obj, key, max, label) {
+  const value = typeof obj?.[key] === "string" ? obj[key].trim() : "";
+  if (value.length > max) {
+    const err = new Error(`${label}: max ${max} characters.`);
+    err.status = 400;
+    throw err;
+  }
+  return value;
+}
+
+/**
+ * customer: {name, email?, phone} — guest checkout supported; email is
+ * optional but recommended (Shiprocket uses it for delivery updates).
+ */
+export function validateCustomer(input) {
+  return {
+    name: requireText(input, "name", 2, 80, "Customer name"),
+    email: optionalText(input, "email", 254, "Email"),
+    phone: (() => {
+      const raw = requireText(input, "phone", 10, 15, "Phone");
+      const digits = raw.replace(/[^\d]/g, "");
+      if (!/^(\d{10}|\d{12}|\d{11,13})$/.test(digits)) {
+        const err = new Error("Phone: 10-digit Indian number (or E.164 dial code).");
+        err.status = 400;
+        throw err;
+      }
+      // Keep the last 10 digits — the VM never needs the +91 prefix.
+      return digits.slice(-10);
+    })(),
+  };
+}
+
+/** address: Indian residential address — everything Shiprocket needs. */
+export function validateAddress(input) {
+  return {
+    line1: requireText(input, "line1", 3, 200, "Address line 1"),
+    line2: optionalText(input, "line2", 100, "Address line 2"),
+    city: requireText(input, "city", 2, 80, "City"),
+    state: requireText(input, "state", 2, 80, "State"),
+    pincode: ((v) => {
+      if (!/^[1-9]\d{5}$/.test(v)) {
+        const err = new Error("Pincode: 6 digits, first not 0.");
+        err.status = 400;
+        throw err;
+      }
+      return v;
+    })(requireText(input, "pincode", 6, 6, "Pincode")),
+  };
+}
+/** Admin-gate: like requireUserId, but the token must carry admin:true. */
+export async function requireAdmin(req) {
+  const header = req.headers.authorization ?? "";
+  if (!header.startsWith("Bearer ")) {
+    const err = new Error("Missing Authorization bearer token.");
+    err.status = 401;
+    throw err;
+  }
+  try {
+    const decoded = await auth.verifyIdToken(header.slice(7));
+    if (decoded.admin !== true) {
+      const err = new Error("Admin only.");
+      err.status = 403;
+      throw err;
+    }
+    return decoded.uid;
+  } catch (err) {
+    if (err.status === 403) throw err;
+    const e = new Error("Invalid auth token.");
+    e.status = 401;
+    throw e;
   }
 }
 
