@@ -64,19 +64,23 @@ async function shiprocketToken() {
   return refreshShiprocketToken();
 }
 
-async function srRequest(path, body, { retryOn401 = true } = {}) {
+async function srRequest(path, body, { retryOn401 = true, method = "POST" } = {}) {
   const token = await shiprocketToken();
-  const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
+  // /courier/serviceability is GET-only on the current API (POST → 405);
+  // parameters ride in the query string instead of a body.
+  const usesQuery = method === "GET" && body && Object.keys(body).length > 0;
+  const url = usesQuery ? `${BASE}${path}?${new URLSearchParams(body)}` : `${BASE}${path}`;
+  const res = await fetch(url, {
+    method,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(body),
+    ...(method === "GET" ? {} : { body: JSON.stringify(body) }),
   });
   if (res.status === 401 && retryOn401) {
     tokenCache = { token: "", fetchedAt: 0 };
-    return srRequest(path, body, { retryOn401: false });
+    return srRequest(path, body, { retryOn401: false, method });
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -241,7 +245,7 @@ export async function shippingQuote(req, res, next) {
     if (/^[1-9]\d{5}$/.test(c.pickupPincode)) body.pickup_postcode = c.pickupPincode;
     else body.default = "1";
 
-    const data = await srRequest("/courier/serviceability", body);
+    const data = await srRequest("/courier/serviceability", body, { method: "GET" });
     const couriers = (data?.data?.available_courier_companies ?? []).map((co) => ({
       name: co.courier_name,
       etaDate: co.estimated_delivery_date ?? "",
