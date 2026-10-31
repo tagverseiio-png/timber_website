@@ -10,6 +10,11 @@ import { refundOrder } from "./refunds.js";
 
 const app = express();
 
+// Behind a single reverse proxy (cloudflared tunnel) — lets express-rate-limit
+// see the real client IP via X-Forwarded-For instead of erroring/warning and
+// keying everyone as the same user.
+app.set("trust proxy", 1);
+
 // Minimal security headers (no extra dependency for three headers).
 app.use((_, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
