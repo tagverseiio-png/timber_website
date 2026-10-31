@@ -14,8 +14,10 @@ import { requireAdmin } from "./orders.js";
  * idempotency keys and cross-checks against known orders.
  */
 
-const BASE = "https://apiv2.shiprocket.in/v1";
-const AUTH_URL = "https://apiv2.shiprocket.in/v1/authentications";
+// Shiprocket v1 external API — base MUST include /external per current docs.
+// (the legacy /v1/authentications path was retired by Shiprocket and 404s).
+const BASE = "https://apiv2.shiprocket.in/v1/external";
+const AUTH_URL = `${BASE}/auth/login`;
 // Token is valid ~10 days; refresh after 8 to leave a safety margin.
 const TOKEN_TTL_MS = 8 * 24 * 60 * 60 * 1000;
 
@@ -309,20 +311,30 @@ function findDeep(obj, key) {
   return undefined;
 }
 
-function basicAuthOk(req, expected) {
+/**
+ * Webhook auth: Shiprocket signs webhooks with a shared security token sent
+ * as the `x-api-key` header (their current panel), and older plugs keep the
+ * HTTP Basic "user:pass" scheme. Both are accepted against the SAME secret
+ * — timing-safe compares on both.
+ */
+function secretOk(req, expected) {
+  const apiKey = typeof req.headers["x-api-key"] === "string" ? req.headers["x-api-key"] : "";
+  const a = Buffer.from(apiKey);
+  const b = Buffer.from(expected);
+  if (a.length === b.length && crypto.timingSafeEqual(a, b)) return true;
+
   const header = req.headers.authorization ?? "";
   const [scheme, encoded] = header.split(" ");
   if (scheme !== "Basic" || !encoded) return false;
   const decoded = Buffer.from(encoded, "base64").toString("utf8");
-  const a = Buffer.from(decoded);
-  const b = Buffer.from(expected);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+  const c = Buffer.from(decoded);
+  return c.length === b.length && crypto.timingSafeEqual(c, b);
 }
 
 export async function shiprocketWebhook(req, res, next) {
   try {
     const c = config.shiprocket;
-    if (c.webhookBasic && !basicAuthOk(req, c.webhookBasic)) {
+    if (c.webhookBasic && !secretOk(req, c.webhookBasic)) {
       return res.status(401).json({ error: "Bad webhook credentials." });
     }
 
