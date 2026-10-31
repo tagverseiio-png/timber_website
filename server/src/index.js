@@ -40,6 +40,9 @@ app.post("/webhooks/razorpay", express.raw({ type: "application/json", limit: "1
 // Path deliberately avoids the words Shiprocket forbids in webhook URLs
 // (shiprocket/sr/kr/kartrocket): it's just the courier provider callback.
 app.post("/webhooks/carrier", express.raw({ type: "application/json", limit: "512kb" }), shiprocketWebhook);
+// Health-probes from merchant panels (GET/HEAD) must answer 200, else the
+// panel refuses to save the webhook ("unable to send request …").
+app.get(["/webhooks/carrier", "/health"], (_, res) => res.json({ ok: true }));
 
 app.use(express.json({ limit: "100kb" }));
 
