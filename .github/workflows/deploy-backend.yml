@@ -1,0 +1,29 @@
+name: Deploy payment backend (VM)
+
+# Vercel-like auto-deploy for the payment VM: every push to main that
+# touches server/** pulls the fresh commit on the VM and reloads pm2.
+# The .env file lives ONLY on the VM — deploys never touch it.
+
+on:
+  push:
+    branches: [main]
+    paths: ["server/**", ".github/workflows/deploy-backend.yml"]
+  workflow_dispatch: {}
+
+concurrency:
+  group: timber-vm-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy on the VM via SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script_stop: true
+          script: |
+            bash /opt/timber_website/server/deploy/vm-deploy.sh
