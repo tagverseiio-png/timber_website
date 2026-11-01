@@ -243,11 +243,11 @@ export async function shippingQuote(req, res, next) {
 
     // NOTE: the serviceability endpoint takes the weight in KILOGRAMS
     // (grams → zero couriers), unlike order creation which uses grams.
-    const body = { postcode: pincode, cod: "0" }; // cod:0 = prepaid serviceability
-    if (/^[1-9]\d{5}$/.test(c.pickupPincode)) body.pickup_postcode = c.pickupPincode;
-    else body.default = "1";
-    body.weight = (config.shiprocket.defaultWeightGrams / 1000) || 0.5;
-    body.md = "1"; // mandatory: mode of delivery — 1 = forward (0 = return)
+    // It wants explicit pickup_postcode + delivery_postcode (+ md=1 forward);
+    // legacy params like postcode/drop_postcode silently yield zero couriers.
+    const body = { cod: "0", weight: (config.shiprocket.defaultWeightGrams / 1000) || 0.5, md: "1" };
+    body.pickup_postcode = /^[1-9]\d{5}$/.test(c.pickupPincode) ? c.pickupPincode : "600034";
+    body.delivery_postcode = pincode;
 
     const data = await srRequest("/courier/serviceability", body, { method: "GET" });
     const couriers = (data?.data?.available_courier_companies ?? []).map((co) => ({
