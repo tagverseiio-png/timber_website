@@ -38,3 +38,4 @@ export default async function CategorySlugPage({
   const titleCased = normalized.charAt(0).toUpperCase() + normalized.slice(1);
   redirect(`/shop?category=${encodeURIComponent(titleCased)}`);
 }
+

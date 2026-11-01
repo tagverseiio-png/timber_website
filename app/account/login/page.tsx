@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -8,7 +8,7 @@ import { signInWithGoogle } from "@/lib/auth/customerAuth";
 import Link from "next/link";
 import { Package, MapPin, Heart, ShieldCheck, AlertCircle } from "lucide-react";
 
-export default function CustomerLoginPage() {
+function CustomerLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get("redirect") || "/account";
@@ -167,5 +167,19 @@ export default function CustomerLoginPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function CustomerLoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-timber-beige flex items-center justify-center">
+          <div className="w-8 h-8 border-3 border-timber-teal border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <CustomerLoginContent />
+    </Suspense>
   );
 }
