@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { CheckCircle2, Package } from "lucide-react";
-import { onValue, ref as dbRef, type DatabaseReference } from "firebase/database";
+import { onAuthStateChanged } from "firebase/auth";
+import { onValue, ref as dbRef } from "firebase/database";
 import { auth, database } from "@/lib/firebase";
 import { formatPrice } from "@/lib/money";
 
@@ -51,27 +52,37 @@ function SuccessContent() {
 
   // Live order subscription. Only when a signed-in session exists that also
   // owns the order — database rules deny everything else (we do NOT open reads).
+  // NOTE: auth.currentUser is null while Firebase restores the session after a
+  // hard reload — wait for onAuthStateChanged instead, or the subscription is
+  // never attached and the page shows no status at all.
   useEffect(() => {
-    if (!order || !auth.currentUser) return;
-    let unsub: (() => void) | null = null;
-    let orderRef: DatabaseReference | null = null;
-    try {
-      orderRef = dbRef(database, `orders/${order}`);
-      unsub = onValue(
-        orderRef,
-        (snap) => {
-          const data = snap.val() as OrderView | null;
-          setOrderView(data);
-          setTrackingAvailable(!!data);
-        },
-        () => setTrackingAvailable(false) // rules denied / VM not written yet
-      );
-    } catch {
-      // Subscription setup should not fail; if it does, stay silent and let
-      // the render fall back to the offline note.
-      unsub = null;
-    }
-    return () => unsub?.();
+    if (!order) return;
+    let unsubDb: (() => void) | null = null;
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      unsubDb?.();
+      unsubDb = null;
+      if (!user) return;
+      try {
+        const orderRef = dbRef(database, `orders/${order}`);
+        unsubDb = onValue(
+          orderRef,
+          (snap) => {
+            const data = snap.val() as OrderView | null;
+            setOrderView(data);
+            setTrackingAvailable(!!data);
+          },
+          () => setTrackingAvailable(false) // rules denied / VM not written yet
+        );
+      } catch {
+        // Subscription setup should not fail; if it does, stay silent and let
+        // the render fall back to the offline note.
+        unsubDb = null;
+      }
+    });
+    return () => {
+      unsubAuth();
+      unsubDb?.();
+    };
   }, [order]);
 
   const status = orderView?.status ?? "pending";

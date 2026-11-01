@@ -6,6 +6,7 @@ import { ProductCard } from "@/components/ui/ProductCard";
 import { StatsStrip } from "@/components/ui/StatsStrip";
 import { WoodShavingCursor } from "@/components/layout/WoodShavingCursor";
 import { fetchFeaturedProducts } from "@/lib/products/server";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { canonical } from "@/lib/seo";
 
 // Split from the initial bundle: the intro is a fixed overlay and the
@@ -35,10 +36,7 @@ export default async function Home() {
 
   return (
     <main className="flex min-h-screen flex-col bg-timber-beige">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
-      />
+      <JsonLd json={orgJsonLd} />
       <CinematicIntro />
       <WoodShavingCursor />
       {/* Hero Section */}

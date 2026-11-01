@@ -1,17 +1,16 @@
 import { getIdTokenResult, type User } from "firebase/auth";
 
 /**
- * Returns true when the signed-in user carries the `admin: true` custom claim,
- * or matches the designated admin email (e.g. admin@timber.com).
+ * Returns true ONLY when the signed-in user carries the `admin: true` custom
+ * claim (set server-side via server/set-admin-claim.mjs). No email fallback —
+ * otherwise anyone who registers e.g. anything@timber.com would see the whole
+ * admin UI.
  */
 export async function hasAdminClaim(user: User): Promise<boolean> {
   try {
     const token = await getIdTokenResult(user, true);
-    if (token.claims.admin === true) return true;
+    return token.claims.admin === true;
   } catch {
-    // fallback to email validation
+    return false;
   }
-
-  const email = user.email?.toLowerCase();
-  return email === "admin@timber.com" || Boolean(email?.endsWith("@timber.com"));
 }

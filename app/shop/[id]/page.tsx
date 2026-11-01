@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { fetchProduct } from "@/lib/products/server";
 import { canonical, SITE_NAME } from "@/lib/seo";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { ProductDetailView } from "@/components/ui/ProductDetailView";
 
 export const revalidate = 300; // product edits go live within 5 minutes
@@ -72,10 +73,7 @@ export default async function ProductDetailsPage({
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <JsonLd json={jsonLd} />
       <ProductDetailView product={product} />
     </>
   );

@@ -1,9 +1,5 @@
 "use client";
 
-// Never prerender the admin panel at build time: it requires runtime Firebase
-// env vars and must not be statically cached (auth-gated).
-export const dynamic = "force-dynamic";
-
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";

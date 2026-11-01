@@ -15,7 +15,7 @@
     //   bypasses rules) creates them; admins may read/update all
     "orders": {
       ".read": "auth != null && auth.token.admin === true",
-      ".indexOn": ["userId", "status"],
+      ".indexOn": ["userId", "status", "createdAt"],
       "$orderId": {
         ".read": "auth != null && (auth.token.admin === true || data.child('userId').val() === auth.uid)",
         ".write": "auth != null && auth.token.admin === true"

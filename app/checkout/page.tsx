@@ -55,7 +55,9 @@ function validateAddressForm(a: AddressForm): string | null {
   if (a.name.trim().length < 2 || a.name.trim().length > 80) return "Full name: 2–80 characters.";
   if (a.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim())) return "Email looks invalid.";
   const digits = a.phone.replace(/\D/g, "");
-  if (digits.length < 10 || digits.length > 15) return "Phone: a 10-digit Indian number (or with dial code).";
+  // Must mirror server/src/orders.js validateCustomer/validateAddress exactly:
+  // phone = ^(\d{10}|\d{12}|\d{11,13})$ → 10–13 digits.
+  if (digits.length < 10 || digits.length > 13) return "Phone: a 10-digit Indian number (or with dial code).";
   if (a.line1.trim().length < 3 || a.line1.trim().length > 200) return "Address line 1: 3–200 characters.";
   if (a.line2.trim().length > 100) return "Address line 2: max 100 characters.";
   if (a.city.trim().length < 2 || a.city.trim().length > 80) return "City: 2–80 characters.";
@@ -70,6 +72,7 @@ export default function CheckoutPage() {
   const { products, loading: catalogLoading } = useCatalog();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [paymentModalError, setPaymentModalError] = useState<string | null>(null);
   const [addr, setAddr] = useState<AddressForm>(EMPTY_ADDRESS);
   const [quote, setQuote] = useState<{ note: string; ok: boolean } | null>(null);
   const [quoteBusy, setQuoteBusy] = useState(false);
@@ -120,12 +123,25 @@ export default function CheckoutPage() {
     .filter((d): d is { line: CartLine; product: CatalogProduct } => d.product !== undefined);
   const totalPaise = detailed.reduce((sum, d) => sum + d.product.pricePaise * d.line.qty, 0);
   const currency = detailed[0]?.product.currency ?? "INR";
+  // Ghost cart: persisted lines whose product was deleted/hidden silently
+  // disappeared above. Paying must be blocked — the server would only 400
+  // AFTER the user filled the whole address form.
+  const ghostLines = detailed.length !== lines.length;
+  const ghostIds = lines
+    .filter((l) => !detailed.some((d) => d.line.id === l.id))
+    .map((l) => l.id);
 
   const pay = async () => {
     setBusy(true);
     setError(null);
+    setPaymentModalError(null);
     try {
       if (lines.length === 0) throw new Error("Your cart is empty.");
+      if (ghostLines || detailed.length === 0)
+        throw new Error(
+          "Some items in your cart are no longer available. Please remove them and try again."
+        );
+      if (totalPaise < 100) throw new Error("Order total must be at least ₹1.");
 
       const addressError = validateAddressForm(addr);
       if (addressError) throw new Error(addressError);
@@ -179,9 +195,17 @@ export default function CheckoutPage() {
               router.push(`/order/failed?order=${resp.razorpay_order_id}&reason=${encodeURIComponent(`Payment ${verdict.status}`)}`);
             }
           } catch (e) {
-            setError(e instanceof Error ? e.message : "Verification failed.");
-          } finally {
+            // Money is CAPTURED at this point — a plain error leaves the user
+            // trapped on checkout, and a retry would charge them twice. Route
+            // them to the order page: it reads live DB state (the payment
+            // webhook usually marks the order paid within seconds) and shows
+            // the real status either way.
             setBusy(false);
+            router.push(
+              `/order/success?order=${order.orderId}&payment=awaiting&reason=${encodeURIComponent(
+                e instanceof Error ? e.message : "verification failed"
+              )}`
+            );
           }
         },
         modal: {
@@ -193,11 +217,15 @@ export default function CheckoutPage() {
       });
 
       rz.on("payment.failed", (resp) => {
+        // Do NOT navigate: Razorpay keeps the modal open and the user can
+        // retry against the SAME order. Routing away created a second order
+        // on retry (double charge). Show an inline error; navigate only when
+        // they dismiss the modal (handled in modal.ondismiss).
         setBusy(false);
-        const reason = resp?.error?.description ?? "Payment failed";
-        router.push(`/order/failed?order=${order.orderId}&reason=${encodeURIComponent(reason)}`);
+        setPaymentModalError(
+          resp?.error?.description ?? "Payment failed — you can retry or close the window."
+        );
       });
-
       rz.open();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Checkout failed.");
@@ -215,6 +243,18 @@ export default function CheckoutPage() {
         ) : lines.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-timber-muted mb-8">Your cart is empty.</p>
+            <Link href="/shop" className="inline-block px-8 py-3 bg-timber-darkwood text-timber-beige">
+              Back to Shop
+            </Link>
+          </div>
+        ) : detailed.length === 0 ? (
+          <div className="text-center py-16">
+            <p className="text-timber-muted mb-8">
+              Items in your cart are no longer available — they were removed or hidden by the store.
+            </p>
+            <Link href="/cart" className="inline-block px-8 py-3 border border-timber-darkwood text-timber-darkwood mr-3">
+              View Cart
+            </Link>
             <Link href="/shop" className="inline-block px-8 py-3 bg-timber-darkwood text-timber-beige">
               Back to Shop
             </Link>
@@ -239,6 +279,9 @@ export default function CheckoutPage() {
             </p>
 
             {error && <p className="text-sm text-red-700 bg-red-50 p-3 rounded mb-4">{error}</p>}
+            {paymentModalError && (
+              <p className="text-sm text-red-700 bg-red-50 p-3 rounded mb-4">{paymentModalError}</p>
+            )}
 
             <div className="mt-6">
               <h2 className="font-serif text-2xl text-timber-darkwood mb-4">Delivery Address</h2>
@@ -263,7 +306,7 @@ export default function CheckoutPage() {
                     type="tel"
                     value={addr.phone}
                     onChange={(e) => setAddr({ ...addr, phone: e.target.value })}
-                    maxLength={15}
+                    maxLength={13}
                     placeholder="e.g. 9876543210"
                     className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-timber-darkwood"
                     required
