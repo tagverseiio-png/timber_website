@@ -241,9 +241,12 @@ export async function shippingQuote(req, res, next) {
     }
     const c = needShiprocketConfig();
 
+    // NOTE: the serviceability endpoint takes the weight in KILOGRAMS
+    // (grams → zero couriers), unlike order creation which uses grams.
     const body = { postcode: pincode, cod: "0" }; // cod:0 = prepaid serviceability
     if (/^[1-9]\d{5}$/.test(c.pickupPincode)) body.pickup_postcode = c.pickupPincode;
     else body.default = "1";
+    body.weight = (config.shiprocket.defaultWeightGrams / 1000) || 0.5;
 
     const data = await srRequest("/courier/serviceability", body, { method: "GET" });
     const couriers = (data?.data?.available_courier_companies ?? []).map((co) => ({
