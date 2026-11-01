@@ -10,7 +10,7 @@ export function getSiteUrl(): string {
   if (explicit) return explicit.replace(/\/$/, "");
   const vercel = process.env.VERCEL_URL;
   if (vercel) return `https://${vercel}`;
-  return "http://localhost:3000";
+  return "https://www.timberteak.com";
 }
 
 export const SITE_NAME = "Timber";
