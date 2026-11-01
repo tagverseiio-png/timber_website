@@ -50,6 +50,8 @@ export function Footer() {
               <li><Link href="/sustainability" className="hover:text-white transition-colors interactive">Sustainability</Link></li>
               <li><Link href="/care" className="hover:text-white transition-colors interactive">Wood Care Guide</Link></li>
               <li><Link href="/contact" className="hover:text-white transition-colors interactive">Contact Us</Link></li>
+              <li><Link href="/account" className="hover:text-white transition-colors interactive font-medium text-white">Customer Profile &amp; Orders</Link></li>
+              <li><Link href="/wishlist" className="hover:text-white transition-colors interactive">Wishlist</Link></li>
             </ul>
           </div>
         </div>

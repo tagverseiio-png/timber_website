@@ -4,18 +4,13 @@ import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { TimberStory } from "@/components/ui/TimberStory";
 import { ProductCard } from "@/components/ui/ProductCard";
 import { StatsStrip } from "@/components/ui/StatsStrip";
-import { WoodShavingCursor } from "@/components/layout/WoodShavingCursor";
 import { fetchFeaturedProducts } from "@/lib/products/server";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { canonical } from "@/lib/seo";
 
-// Split from the initial bundle: the intro is a fixed overlay and the
-// slider sits far below the fold. Both are SSR-safe ("use client" with
-// window/sessionStorage access inside effects only), so plain dynamic()
-// code-splits without removing them from server HTML (no CLS/SEO cost).
-const CinematicIntro = dynamic(
-  () => import("@/components/ui/CinematicIntro").then((m) => m.CinematicIntro)
-);
+// Split from the initial bundle: the slider sits far below the fold.
+// SSR-safe ("use client" with window/sessionStorage access inside effects only),
+// so plain dynamic() code-splits without removing it from server HTML (no CLS/SEO cost).
 const BeforeAfterSlider = dynamic(
   () => import("@/components/ui/BeforeAfterSlider").then((m) => m.BeforeAfterSlider)
 );
@@ -75,8 +70,6 @@ export default async function Home() {
   return (
     <main className="flex min-h-screen flex-col bg-timber-beige">
       <JsonLd json={storeJsonLd} />
-      <CinematicIntro />
-      <WoodShavingCursor />
       {/* Hero Section */}
       <HeroSection />
 

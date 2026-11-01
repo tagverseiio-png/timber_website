@@ -3,7 +3,6 @@ import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { CustomCursor } from "@/components/layout/CustomCursor";
 import { CartHydrator } from "@/components/layout/CartHydrator";
 import { SITE_NAME, canonical, getSiteUrl } from "@/lib/seo";
 
@@ -58,7 +57,6 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${playfair.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans text-timber-darkwood bg-timber-beige">
         <CartHydrator />
-        <CustomCursor />
         <Navbar />
         <main className="flex-grow pt-24">{children}</main>
         <Footer />

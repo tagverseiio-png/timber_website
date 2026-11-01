@@ -1,33 +1,15 @@
 "use client";
 
-import { useRef, MouseEvent, useEffect, useState } from "react";
+import { useRef, MouseEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, useScroll, useTransform, useSpring, useMotionValue, useReducedMotion, AnimatePresence, Variants } from "framer-motion";
-import { useCursorStore } from "@/store/useCursorStore";
+import { motion, useScroll, useTransform, useSpring, useMotionValue, useReducedMotion, Variants } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { SawdustParticles } from "./SawdustParticles";
 
 export function HeroSection() {
   const containerRef = useRef<HTMLDivElement>(null);
   const shouldReduceMotion = useReducedMotion();
-  const { setCursorState, resetCursor } = useCursorStore();
-  const [isRevealed, setIsRevealed] = useState(false);
-
-  useEffect(() => {
-    const hasSeenIntro = sessionStorage.getItem("hasSeenCinematicIntro");
-    
-    if (hasSeenIntro) {
-      // Trigger reveal sequence after a short delay normally
-      const timer = setTimeout(() => setIsRevealed(true), 500);
-      return () => clearTimeout(timer);
-    } else {
-      // Wait for CinematicIntro to finish
-      const handleIntro = () => setIsRevealed(true);
-      window.addEventListener("introComplete", handleIntro);
-      return () => window.removeEventListener("introComplete", handleIntro);
-    }
-  }, []);
 
   // Scroll Parallax
   const { scrollYProgress, scrollY } = useScroll({
@@ -136,26 +118,6 @@ export function HeroSection() {
       style={{ opacity: opacityTransform }}
       className="relative w-full h-[90vh] md:h-screen flex items-center justify-center pt-20 -mt-24 overflow-hidden bg-timber-darkwood"
     >
-      {/* Wood Grain Double Door Reveal */}
-      <AnimatePresence>
-        {!isRevealed && (
-          <div className="absolute inset-0 z-50 flex pointer-events-none">
-            <motion.div
-              initial={{ x: "0%" }}
-              exit={{ x: "-100%" }}
-              transition={{ duration: 1.2, ease: [0.76, 0, 0.24, 1] }}
-              className="w-1/2 h-full bg-timber-darkwood bg-[url('https://images.unsplash.com/photo-1550684376-efcbd6e3f031?q=80&w=1000&auto=format&fit=crop')] bg-cover border-r-2 border-black/30 shadow-2xl"
-            />
-            <motion.div
-              initial={{ x: "0%" }}
-              exit={{ x: "100%" }}
-              transition={{ duration: 1.2, ease: [0.76, 0, 0.24, 1] }}
-              className="w-1/2 h-full bg-timber-darkwood bg-[url('https://images.unsplash.com/photo-1550684376-efcbd6e3f031?q=80&w=1000&auto=format&fit=crop')] bg-cover border-l-2 border-black/30 shadow-2xl"
-            />
-          </div>
-        )}
-      </AnimatePresence>
-
       <SawdustParticles />
 
       {/* Background Image & Mouse Parallax */}
@@ -173,8 +135,6 @@ export function HeroSection() {
           fill
           priority
           className="object-cover brightness-[0.65]"
-          onMouseEnter={() => setCursorState("EXPLORE", false)}
-          onMouseLeave={resetCursor}
         />
 
         {/* Parallax Logs (Back) */}
@@ -258,8 +218,6 @@ export function HeroSection() {
         <motion.div variants={fadeVariants} className="flex flex-col sm:flex-row gap-6 w-full sm:w-auto">
           <Link
             href="/shop"
-            onMouseEnter={() => setCursorState("SHOP", true)}
-            onMouseLeave={resetCursor}
             className="group relative overflow-hidden px-8 py-4 bg-timber-beige text-timber-darkwood font-medium tracking-wider uppercase text-sm transition-colors interactive flex items-center justify-center gap-3"
           >
             <span className="relative z-10 group-hover:text-white transition-colors duration-300">
@@ -271,8 +229,6 @@ export function HeroSection() {
 
           <Link
             href="/about"
-            onMouseEnter={() => setCursorState("DISCOVER", false)}
-            onMouseLeave={resetCursor}
             className="group px-8 py-4 bg-transparent border border-timber-beige text-timber-beige font-medium tracking-wider uppercase text-sm hover:bg-timber-beige/10 transition-colors interactive flex items-center justify-center gap-3"
           >
             <span>Discover Our Craft</span>

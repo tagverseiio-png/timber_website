@@ -81,13 +81,13 @@ export function Navbar() {
         </nav>
 
         {/* Icons */}
-        <div className="flex items-center space-x-5 text-timber-darkwood">
-          <Link href="/shop" aria-label="Search Catalog" className="hover:text-timber-teal transition-colors interactive">
+        <div className="flex items-center space-x-3 sm:space-x-4 text-timber-darkwood">
+          <Link href="/shop" aria-label="Search Catalog" className="hover:text-timber-teal transition-colors interactive p-1">
             <Search size={20} strokeWidth={1.5} />
           </Link>
 
           {/* Wishlist */}
-          <Link href="/wishlist" aria-label="Wishlist" className="hover:text-timber-teal transition-colors relative interactive hidden sm:block">
+          <Link href="/wishlist" aria-label="Wishlist" className="hover:text-timber-teal transition-colors relative interactive hidden sm:block p-1">
             <Heart size={20} strokeWidth={1.5} />
             {wishlistCount > 0 && (
               <span className="absolute -top-1 -right-1.5 bg-timber-teal text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
@@ -96,39 +96,37 @@ export function Navbar() {
             )}
           </Link>
 
-          {/* Customer Account */}
+          {/* Customer Profile / Sign In Pill */}
           <Link
             href={user ? "/account" : "/account/login"}
-            aria-label={user ? "My Account" : "Sign In with Google"}
-            title={user ? `My Account (${user.displayName || user.email})` : "Sign In with Google"}
-            className="hover:text-timber-teal transition-colors relative interactive flex items-center gap-2"
+            aria-label={user ? "My Profile & Orders" : "Sign In with Google"}
+            title={user ? `Profile & Orders (${user.displayName || user.email})` : "Sign In with Google"}
+            className="hover:text-timber-teal hover:border-timber-teal border border-timber-darkwood/20 rounded-full px-3 py-1.5 transition-all interactive flex items-center gap-2 bg-timber-beige/50 backdrop-blur-xs"
           >
-            <div className="relative">
+            <div className="relative flex items-center justify-center">
               {user?.photoURL ? (
                 <Image
                   src={user.photoURL}
-                  alt={user.displayName || "Account"}
-                  width={24}
-                  height={24}
-                  className="w-6 h-6 rounded-full object-cover border border-timber-darkwood/20"
+                  alt={user.displayName || "Profile"}
+                  width={20}
+                  height={20}
+                  className="w-5 h-5 rounded-full object-cover border border-timber-darkwood/20"
                   unoptimized
                 />
               ) : (
-                <UserIcon size={20} strokeWidth={1.5} />
+                <UserIcon size={16} strokeWidth={1.75} />
               )}
               {user && (
-                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-600 ring-2 ring-white" />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-600 ring-1 ring-white" />
               )}
             </div>
-            {user && (
-              <span className="text-xs font-medium hidden lg:inline max-w-[90px] truncate">
-                {user.displayName?.split(" ")[0] || "Account"}
-              </span>
-            )}
+            <span className="text-xs font-semibold tracking-wide uppercase">
+              {user ? (user.displayName?.split(" ")[0] || "Profile") : "Sign In"}
+            </span>
           </Link>
 
           {/* Cart */}
-          <Link href="/cart" aria-label="Cart" className="hover:text-timber-teal transition-colors relative interactive">
+          <Link href="/cart" aria-label="Cart" className="hover:text-timber-teal transition-colors relative interactive p-1">
             <ShoppingBag size={20} strokeWidth={1.5} />
             {cartCount > 0 && (
               <span className="absolute -top-1 -right-1.5 bg-timber-teal text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
@@ -139,7 +137,7 @@ export function Navbar() {
           
           {/* Mobile Menu Toggle */}
           <button 
-            className="md:hidden ml-2" 
+            className="md:hidden ml-1 p-1" 
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle Menu"
           >
@@ -178,11 +176,11 @@ export function Navbar() {
 
             <Link
               href={user ? "/account" : "/account/login"}
-              className="text-lg tracking-wide text-timber-teal font-medium pb-2 flex items-center gap-2"
+              className="text-lg tracking-wide text-timber-teal font-semibold pb-2 flex items-center gap-2.5"
               onClick={() => setMobileMenuOpen(false)}
             >
-              <UserIcon size={18} />
-              <span>{user ? `Account (${user.displayName || "Orders"})` : "Sign In / Register"}</span>
+              <UserIcon size={20} />
+              <span>{user ? `Profile & Orders (${user.displayName?.split(" ")[0] || "Account"})` : "Sign In with Google (Profile / Orders)"}</span>
             </Link>
           </nav>
         </div>

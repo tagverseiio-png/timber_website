@@ -48,6 +48,15 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "firebasestorage.googleapis.com",
       },
+      {
+        // Google customer profile avatar photos
+        protocol: "https",
+        hostname: "*.googleusercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
     ],
   },
   async headers() {
@@ -58,6 +67,16 @@ const nextConfig: NextConfig = {
       {
         source: "/gallery",
         destination: "/projects",
+        permanent: true,
+      },
+      {
+        source: "/profile",
+        destination: "/account",
+        permanent: true,
+      },
+      {
+        source: "/orders",
+        destination: "/account",
         permanent: true,
       },
     ];
