@@ -136,6 +136,47 @@ function shiprocketDate(ms) {
 }
 
 /**
+ * GET /courier/serviceability — the ONLY signature the current API accepts,
+ * with the weight in KILOGRAMS (grams → zero couriers). Explicit
+ * pickup_postcode + delivery_postcode are required (legacy `postcode`
+ * silently yields zero couriers). Returns normalized couriers:
+ * [{name, etaDate, rate}] — rate is the quoted price in RUPEES.
+ */
+async function fetchServiceability(deliveryPostcode, weightGrams) {
+  const c = needShiprocketConfig();
+  const body = {
+    cod: "0",
+    weight: Math.max(0.05, weightGrams / 1000),
+    md: "1",
+    pickup_postcode: /^[1-9]\d{5}$/.test(c.pickupPincode) ? c.pickupPincode : "600034",
+    delivery_postcode: deliveryPostcode,
+  };
+  const data = await srRequest("/courier/serviceability", body, { method: "GET" });
+  return (data?.data?.available_courier_companies ?? []).map((co) => ({
+    name: co.courier_name,
+    etaDate: co.estimated_delivery_date ?? "",
+    rate: Number(co.rate ?? 0),
+  }));
+}
+
+/**
+ * The cheapest courier for a real parcel (build the parcel spec from the
+ * actual order items — per-item weights with the configured fallback).
+ * Returns {name, etaDate, rate} in RUPEES, or null when the pincode is
+ * unserviceable. Throws like the rest of the module on Shiprocket outages —
+ * callers must NOT ship (or charge) based on a guess.
+ */
+export async function quoteCheapestCourier(items, deliveryPostcode) {
+  const spec = parcelSpec(items);
+  const couriers = await fetchServiceability(deliveryPostcode, spec.weight);
+  let best = null;
+  for (const co of couriers) {
+    if (Number.isFinite(co.rate) && co.rate > 0 && (!best || co.rate < best.rate)) best = co;
+  }
+  return best;
+}
+
+/**
  * POST /fulfill {orderId} — admin action ("Approve & Ship").
  * Creates the Shiprocket order for a PAID order and assigns an AWB.
  * Idempotent: rerunning returns the existing shipment data unchanged.
@@ -230,8 +271,12 @@ export async function fulfill(req, res, next) {
 }
 
 /**
- * POST /shipping/quote {pincode} — public pre-payment check from the
- * storefront: is the destination serviceable (prepaid) and what's the ETA?
+ * POST /shipping/quote {pincode, items?: [{id, qty}]} — public pre-payment
+ * check from the storefront: is the destination serviceable (prepaid), what's
+ * the ETA and what would shipping COST (cheapest courier)? When items are
+ * sent the parcel weight is computed from the CATALOG via the Admin SDK —
+ * the same source of truth /create-order charges from, so the estimate shown
+ * never diverges from the charge.
  */
 export async function shippingQuote(req, res, next) {
   try {
@@ -239,23 +284,50 @@ export async function shippingQuote(req, res, next) {
     if (!/^[1-9]\d{5}$/.test(pincode)) {
       throw new HttpError(400, "pincode: 6 digits, first not 0.");
     }
-    const c = needShiprocketConfig();
 
-    // NOTE: the serviceability endpoint takes the weight in KILOGRAMS
-    // (grams → zero couriers), unlike order creation which uses grams.
-    // It wants explicit pickup_postcode + delivery_postcode (+ md=1 forward);
-    // legacy params like postcode/drop_postcode silently yield zero couriers.
-    const body = { cod: "0", weight: (config.shiprocket.defaultWeightGrams / 1000) || 0.5, md: "1" };
-    body.pickup_postcode = /^[1-9]\d{5}$/.test(c.pickupPincode) ? c.pickupPincode : "600034";
-    body.delivery_postcode = pincode;
+    // Optional cart lines: only {id: string, qty: int 1–10}, max 50.
+    const rawItems = Array.isArray(req.body?.items) ? req.body.items.slice(0, 50) : [];
+    const lines = rawItems
+      .map((line, i) => {
+        const id = typeof line?.id === "string" ? line.id.trim() : "";
+        const qty = Number(line?.qty);
+        if (!id || id.length > 200 || !Number.isInteger(qty) || qty < 1 || qty > 10) return null;
+        return { id, qty };
+      })
+      .filter(Boolean);
 
-    const data = await srRequest("/courier/serviceability", body, { method: "GET" });
-    const couriers = (data?.data?.available_courier_companies ?? []).map((co) => ({
-      name: co.courier_name,
-      etaDate: co.estimated_delivery_date ?? "",
-      rate: Number(co.rate ?? 0),
-    }));
-    res.json({ serviceable: couriers.length > 0, couriers });
+    let weightGrams;
+    if (lines.length > 0) {
+      const catalog = (await db.ref("projects").get()).val() ?? {};
+      const parcelItems = [];
+      for (const { id, qty } of lines) {
+        const row = catalog[id];
+        // Unknown/deleted cart lines: weight falls back to the item spec the
+        // storefront CAN'T know — display-only; /create-order still rejects
+        // unavailable items before any charge happens.
+        parcelItems.push({
+          name: row?.name ?? id,
+          qty,
+          weightGrams: row?.weightGrams == null ? null : Number(row.weightGrams),
+          lengthCm: 0,
+          widthCm: 0,
+          heightCm: 0,
+        });
+      }
+      weightGrams = parcelSpec(parcelItems).weight;
+    } else {
+      const fallback = Number(config.shiprocket.defaultWeightGrams);
+      weightGrams = Number.isFinite(fallback) && fallback > 0 ? fallback : 500;
+    }
+
+    const couriers = await fetchServiceability(pincode, weightGrams);
+    let cheapest = null;
+    for (const co of couriers) {
+      if (Number.isFinite(co.rate) && co.rate > 0 && (!cheapest || co.rate < cheapest.rate)) {
+        cheapest = co;
+      }
+    }
+    res.json({ serviceable: couriers.length > 0, couriers, cheapest });
   } catch (err) {
     next(err);
   }

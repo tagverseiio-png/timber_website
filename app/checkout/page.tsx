@@ -74,32 +74,47 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [paymentModalError, setPaymentModalError] = useState<string | null>(null);
   const [addr, setAddr] = useState<AddressForm>(EMPTY_ADDRESS);
-  const [quote, setQuote] = useState<{ note: string; ok: boolean } | null>(null);
+  const [quote, setQuote] = useState<{
+    ok: boolean;
+    note: string;
+    shippingPaise?: number;
+    shippingCourier?: string;
+  } | null>(null);
   const [quoteBusy, setQuoteBusy] = useState(false);
 
-  // Live serviceability pre-check: once a full pincode is entered, ask the VM
-  // (which asks Shiprocket). Deliberately SILENT when the VM is not configured
-  // or unreachable — the check is a nice-to-have, never a checkout blocker.
-  // The shown quote is DERIVED (null whenever the pincode is incomplete) so no
-  // synchronous setState is needed in the effect body.
+  // Live shipping estimate: once a full pincode is entered, ask the VM (which
+  // asks Shiprocket) with the ACTUAL cart lines so the parcel weight — and
+  // therefore the estimated cheapest-courier cost — matches what /create-order
+  // charges. Deliberately SILENT when the VM is unreachable (estimate only,
+  // never a checkout blocker; the charge is still computed server-side).
   useEffect(() => {
     if (addr.pincode.length !== 6) return;
     let cancelled = false;
     const timer = setTimeout(() => {
       setQuoteBusy(true);
-      postToPaymentApi<{ serviceable: boolean; couriers: { name: string; etaDate: string }[] }>(
-        "/shipping/quote",
-        { pincode: addr.pincode }
-      )
+      postToPaymentApi<{
+        serviceable: boolean;
+        couriers: { name: string; etaDate: string; rate?: number }[];
+        cheapest?: { name: string; etaDate: string; rate: number } | null;
+      }>("/shipping/quote", {
+        pincode: addr.pincode,
+        items: lines.map((l) => ({ id: l.id, qty: l.qty })),
+      })
         .then((r) => {
           if (cancelled) return;
           if (r.serviceable && r.couriers.length > 0) {
             const fastest = r.couriers[0];
+            const cheapest = r.cheapest ?? null;
             setQuote({
               ok: true,
               note: `Serviceable — ${r.couriers.length} courier${r.couriers.length > 1 ? "s" : ""}${
                 fastest.etaDate ? `, fastest delivery around ${fastest.etaDate}` : ""
               }.`,
+              shippingPaise:
+                cheapest && Number.isFinite(cheapest.rate)
+                  ? Math.round(cheapest.rate * 100)
+                  : undefined,
+              shippingCourier: cheapest?.name,
             });
           } else {
             setQuote({ ok: false, note: "No prepaid courier services this pincode yet." });
@@ -116,7 +131,7 @@ export default function CheckoutPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [addr.pincode]);
+  }, [addr.pincode, lines]);
 
   const detailed = lines
     .map((l) => ({ line: l, product: products.find((p) => p.id === l.id) }))
@@ -262,7 +277,7 @@ export default function CheckoutPage() {
         ) : (
           <div className="bg-white p-6 md:p-8 rounded">
             <h2 className="font-serif text-2xl text-timber-darkwood mb-4">Order Summary</h2>
-            <ul className="divide-y divide-timber-darkwood/10 mb-6">
+            <ul className="divide-y divide-timber-darkwood/10 mb-4">
               {detailed.map(({ line, product }) => (
                 <li key={line.id} className="py-3 flex justify-between text-sm">
                   <span>{product!.name} × {line.qty}</span>
@@ -270,13 +285,50 @@ export default function CheckoutPage() {
                 </li>
               ))}
             </ul>
+            <div className="flex justify-between text-sm pb-2">
+              <span>Subtotal</span>
+              <span className="font-medium">{formatPrice(totalPaise, currency)}</span>
+            </div>
+            <div className="flex justify-between text-sm border-t border-timber-darkwood/10 pt-3 pb-2">
+              <span>
+                Shipping
+                {quoteBusy && addr.pincode.length === 6 ? (
+                  <span className="text-timber-muted"> — checking…</span>
+                ) : quote?.ok && quote.shippingPaise != null ? (
+                  <span className="text-timber-muted text-xs"> {quote.shippingCourier ? `(${quote.shippingCourier})` : ""}</span>
+                ) : null}
+              </span>
+              <span className="font-medium">
+                {quote?.ok && quote.shippingPaise != null ? (
+                  formatPrice(quote.shippingPaise, currency)
+                ) : addr.pincode.length === 6 ? (
+                  <span className="text-timber-muted text-xs">based on pincode</span>
+                ) : (
+                  <span className="text-timber-muted text-xs">enter pincode</span>
+                )}
+              </span>
+            </div>
             <div className="flex justify-between font-medium text-xl border-t border-timber-darkwood/10 pt-4 mb-2">
               <span>Total</span>
-              <span>{formatPrice(totalPaise, currency)}</span>
+              <span>
+                {formatPrice(
+                  totalPaise + (quote?.ok && quote.shippingPaise != null ? quote.shippingPaise : 0),
+                  currency
+                )}
+                <span className={
+                  quote?.ok && quote.shippingPaise != null ? "hidden" : "text-sm text-timber-muted font-normal"
+                }>
+                  {" "}+ shipping
+                </span>
+              </span>
             </div>
             <p className="text-xs text-timber-muted mb-6">
-              Final amount is computed securely on our payment server — the price shown here is indicative.
+              Shipping is charged at the cheapest available courier rate, fixed securely on our
+              payment server when you pay — the above is an estimate.
             </p>
+            {quote && !quote.ok && (
+              <p className="text-sm text-red-700 bg-red-50 p-3 rounded mb-4">{quote.note}</p>
+            )}
 
             {error && <p className="text-sm text-red-700 bg-red-50 p-3 rounded mb-4">{error}</p>}
             {paymentModalError && (

@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import Razorpay from "razorpay";
 import { config } from "./config.js";
 import { db, auth } from "./firebase.js";
+import { quoteCheapestCourier } from "./shiprocket.js";
 
 export const razorpay = new Razorpay({
   key_id: config.razorpayKeyId,
@@ -104,6 +105,37 @@ export async function createOrder(req, res, next) {
       throw err;
     }
 
+    // Shipping is CHARGED, not eaten: the cheapest courier for the REAL parcel
+    // (per-item weights, real destination pincode). The client amount is never
+    // trusted — this is the single server-side source of truth for the total.
+    const subtotalPaise = amountPaise;
+    let shippingPaise = 0;
+    let shippingCourier = "";
+    let courierEta = "";
+    try {
+      const best = await quoteCheapestCourier(orderItems, address.pincode);
+      if (!best) {
+        const err = new Error(
+          `Sorry — we don't have a courier serving ${address.pincode} right now. Try another pincode or contact us.`
+        );
+        err.status = 400;
+        throw err;
+      }
+      shippingPaise = Math.max(0, Math.round(best.rate * 100));
+      shippingCourier = String(best.name ?? "");
+      courierEta = String(best.etaDate ?? "");
+    } catch (err) {
+      if (err.status === 400) throw err; // unserviceable / bad parcel spec
+      // Shiprocket outage: refuse to create the order rather than silently
+      // ship it free (or fail the charge after the fact).
+      const e = new Error("Shipping pricing is temporarily unavailable — please try again in a minute.");
+      e.status = 502;
+      e.cause = err;
+      console.error("[create-order] shipping quote failed:", err);
+      throw e;
+    }
+    amountPaise += shippingPaise;
+
     const rzOrder = await razorpay.orders.create({
       amount: amountPaise,
       currency: config.currency,
@@ -117,6 +149,14 @@ export async function createOrder(req, res, next) {
       status: "pending", // → paid → processing → shipped → out_for_delivery → delivered (failed/refunded/rto wrong-way states)
       items: orderItems,
       amountPaise,
+      subtotalPaise,
+      shipping: {
+        paise: shippingPaise,
+        courier: shippingCourier,
+        etaDate: courierEta,
+        model: "cheapest_courier",
+        quotedAt: now,
+      },
       currency: config.currency,
       customer,
       address,
@@ -128,6 +168,9 @@ export async function createOrder(req, res, next) {
     res.json({
       orderId: rzOrder.id,
       amount: amountPaise,
+      subtotal: subtotalPaise,
+      shipping: shippingPaise,
+      shippingCourier,
       currency: config.currency,
       keyId: config.razorpayKeyId, // public key only — safe to expose
     });
