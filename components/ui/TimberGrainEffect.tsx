@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, MouseEvent } from "react";
+import { useRef, MouseEvent } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 
 interface TimberGrainEffectProps {

@@ -2,7 +2,6 @@
 
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import Image from "next/image";
-import { motion } from "framer-motion";
 
 export default function AboutPage() {
   return (

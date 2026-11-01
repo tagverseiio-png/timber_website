@@ -65,7 +65,7 @@ app.post("/fulfill", paymentLimiter, fulfill);
 app.post("/refund", paymentLimiter, refundOrder);
 
 // JSON error envelope (never leaks stack traces or secrets).
-// eslint-disable-next-line no-unused-vars
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err, _req, res, _next) => {
   const status = err.status ?? 500;
   if (status >= 500) console.error(err);

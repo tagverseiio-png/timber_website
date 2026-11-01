@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode } from "react";
+import { useHydrated } from "@/lib/useHydrated";
 
 interface ScrollRevealProps {
   children: ReactNode;
@@ -18,11 +19,8 @@ export function ScrollReveal({
   direction = "up",
   duration = 0.8,
 }: ScrollRevealProps) {
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  // No setState-in-effect mount detection (cascading render anti-pattern).
+  const isMounted = useHydrated();
 
   if (!isMounted) {
     return <div className={className}>{children}</div>;

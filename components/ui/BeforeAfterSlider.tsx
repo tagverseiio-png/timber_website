@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { ArrowLeftRight } from "lucide-react";
 
@@ -21,7 +21,7 @@ export function BeforeAfterSlider({
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleMove = (clientX: number) => {
+  const handleMove = useCallback((clientX: number) => {
     if (!containerRef.current) return;
     
     const rect = containerRef.current.getBoundingClientRect();
@@ -29,36 +29,33 @@ export function BeforeAfterSlider({
     const percent = Math.max(0, Math.min((x / rect.width) * 100, 100));
     
     setSliderPosition(percent);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent | MouseEvent) => {
-    if (!isDragging) return;
-    if ("touches" in e) return; // ignore touch here
-    handleMove(e.clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent | TouchEvent) => {
-    if (!isDragging) return;
-    handleMove(e.touches[0].clientX);
-  };
+  }, []);
 
   useEffect(() => {
+    if (!isDragging) return;
+
     const onMouseUp = () => setIsDragging(false);
+    const onMouseMove = (e: MouseEvent) => {
+      handleMove(e.clientX);
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches[0]) {
+        handleMove(e.touches[0].clientX);
+      }
+    };
     
-    if (isDragging) {
-      window.addEventListener("mouseup", onMouseUp);
-      window.addEventListener("mousemove", handleMouseMove as any);
-      window.addEventListener("touchend", onMouseUp);
-      window.addEventListener("touchmove", handleTouchMove as any);
-    }
+    window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("touchend", onMouseUp);
+    window.addEventListener("touchmove", onTouchMove);
     
     return () => {
       window.removeEventListener("mouseup", onMouseUp);
-      window.removeEventListener("mousemove", handleMouseMove as any);
+      window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("touchend", onMouseUp);
-      window.removeEventListener("touchmove", handleTouchMove as any);
+      window.removeEventListener("touchmove", onTouchMove);
     };
-  }, [isDragging]);
+  }, [isDragging, handleMove]);
 
   return (
     <div 

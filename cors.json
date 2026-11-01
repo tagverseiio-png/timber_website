@@ -4,7 +4,9 @@
       "http://localhost:3000",
       "http://localhost:3001",
       "https://timber-15a4d.web.app",
-      "https://timber-15a4d.firebaseapp.com"
+      "https://timber-15a4d.firebaseapp.com",
+      "https://www.timberteak.com",
+      "https://timberteak.com"
     ],
     "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
     "maxAgeSeconds": 3600,

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { useHydrated } from "@/lib/useHydrated";
 
 interface Particle {
   id: number;
@@ -19,11 +20,8 @@ const PARTICLE_COUNT = 24;
 
 export function SawdustParticles() {
   const shouldReduceMotion = useReducedMotion();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // No setState-in-effect mount detection (cascading render anti-pattern).
+  const mounted = useHydrated();
 
   // Deterministic pseudo-random generation to avoid Math.random() SSR/client drift
   const particles = useMemo<Particle[]>(

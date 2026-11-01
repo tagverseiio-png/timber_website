@@ -25,6 +25,31 @@
     "webhookEvents": {
       ".read": "auth != null && auth.token.admin === true",
       ".write": "auth != null && auth.token.admin === true"
+    },
+    // Customer inquiries submitted via /contact:
+    // - Authenticated users (including anonymous guest sessions) may create a new inquiry
+    // - Admins may read, update status, and remove inquiries
+    "inquiries": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".indexOn": ["createdAt", "status"],
+      "$inquiryId": {
+        ".write": "auth != null && (!data.exists() || auth.token.admin === true)",
+        ".validate": "newData.hasChildren(['name', 'email', 'message', 'createdAt', 'status', 'uid'])"
+      }
+    },
+    // Customer profile records and default delivery address
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
+      }
+    },
+    // Index of orders placed by customer (for direct user lookup)
+    "userOrders": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
+      }
     }
   }
 }

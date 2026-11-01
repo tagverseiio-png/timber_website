@@ -165,6 +165,13 @@ export async function createOrder(req, res, next) {
       updatedAt: now,
     });
 
+    if (userId) {
+      await db.ref(`userOrders/${userId}/${rzOrder.id}`).set({
+        id: rzOrder.id,
+        createdAt: now,
+      });
+    }
+
     res.json({
       orderId: rzOrder.id,
       amount: amountPaise,

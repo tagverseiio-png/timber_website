@@ -1,4 +1,4 @@
-const featuredProducts = [
+export const featuredProducts = [
   {
     id: "prod-1",
     name: "The Artisan Dining Table",

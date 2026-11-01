@@ -28,20 +28,20 @@ function optional(name: string, fallback = ""): string {
 
 export const env = {
   firebase: {
-    apiKey: required("NEXT_PUBLIC_FIREBASE_API_KEY", "AIzaSyB4wMZ0rw8ri5YFFrFPcR8eKtFmqml5OEs"),
-    authDomain: required("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", "timber-15a4d.firebaseapp.com"),
-    databaseURL: required("NEXT_PUBLIC_FIREBASE_DATABASE_URL", "https://timber-15a4d-default-rtdb.asia-southeast1.firebasedatabase.app"),
-    projectId: required("NEXT_PUBLIC_FIREBASE_PROJECT_ID", "timber-15a4d"),
-    storageBucket: required("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET", "timber-15a4d.firebasestorage.app"),
-    messagingSenderId: required("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID", "309983994119"),
-    appId: required("NEXT_PUBLIC_FIREBASE_APP_ID", "1:309983994119:web:f0bd1327b00a4a739125a2"),
+    apiKey: required("NEXT_PUBLIC_FIREBASE_API_KEY"),
+    authDomain: required("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
+    databaseURL: required("NEXT_PUBLIC_FIREBASE_DATABASE_URL"),
+    projectId: required("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
+    storageBucket: required("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"),
+    messagingSenderId: required("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
+    appId: required("NEXT_PUBLIC_FIREBASE_APP_ID"),
     measurementId: optional("NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID"),
   },
-  siteUrl: optional("NEXT_PUBLIC_SITE_URL", "http://localhost:3000"),
-  currency: optional("NEXT_PUBLIC_CURRENCY", "INR"),
-  razorpayKeyId: optional("NEXT_PUBLIC_RAZORPAY_KEY_ID", "rzp_live_TtAJiKuy9j7ZEb"),
-  /** VM base URL, e.g. https://pay.example.com — required for checkout. */
-  paymentApiUrl: optional("NEXT_PUBLIC_PAYMENT_API_URL"),
+  siteUrl: required("NEXT_PUBLIC_SITE_URL"), // e.g. https://www.timberteak.com
+  currency: required("NEXT_PUBLIC_CURRENCY"),
+  razorpayKeyId: required("NEXT_PUBLIC_RAZORPAY_KEY_ID"), // public key id (rzp_live_…), safe to ship to browsers
+  /** VM base URL, e.g. https://pay.timberteak.com — required for checkout. */
+  paymentApiUrl: required("NEXT_PUBLIC_PAYMENT_API_URL"),
 } as const;
 
 export type AppEnv = typeof env;

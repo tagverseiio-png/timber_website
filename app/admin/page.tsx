@@ -613,6 +613,165 @@ function OrdersSection({ notify, user }: { notify: (kind: "success" | "error", m
 }
 
 // ---------------------------------------------------------------------------
+// Inquiries section (contact form submissions from /contact)
+// ---------------------------------------------------------------------------
+interface InquiryRow {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  subject: string;
+  message: string;
+  status: "new" | "handled";
+  createdAt?: number;
+}
+
+function InquiriesSection({ notify, user }: { notify: (kind: "success" | "error", msg: string) => void; user: User | null }) {
+  const [inquiries, setInquiries] = useState<InquiryRow[]>([]);
+  const [listError, setListError] = useState<string | null>(null);
+  const [actingOn, setActingOn] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const inquiriesQuery = query(
+      ref(database, "inquiries"),
+      orderByChild("createdAt"),
+      limitToLast(50)
+    );
+    const unsub = onValue(
+      inquiriesQuery,
+      (snap) => {
+        const data = (snap.val() ?? {}) as Record<string, Omit<InquiryRow, "id">>;
+        const rows = Object.entries(data)
+          .map(([id, inq]) => ({ id, ...inq }) as InquiryRow)
+          .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+        setInquiries(rows);
+        setListError(null);
+      },
+      (err) => setListError(err.message)
+    );
+    return () => unsub();
+  }, [user]);
+
+  const toggleStatus = async (inq: InquiryRow) => {
+    setActingOn(inq.id);
+    const nextStatus = inq.status === "handled" ? "new" : "handled";
+    try {
+      await update(ref(database, `inquiries/${inq.id}`), { status: nextStatus });
+      notify("success", `Inquiry marked as ${nextStatus}.`);
+    } catch (err: unknown) {
+      notify("error", err instanceof Error ? err.message : "Failed to update status.");
+    } finally {
+      setActingOn(null);
+    }
+  };
+
+  const deleteInquiry = async (inq: InquiryRow) => {
+    if (!window.confirm(`Delete inquiry from ${inq.name}?`)) return;
+    setActingOn(inq.id);
+    try {
+      await remove(ref(database, `inquiries/${inq.id}`));
+      notify("success", "Inquiry deleted.");
+    } catch (err: unknown) {
+      notify("error", err instanceof Error ? err.message : "Failed to delete inquiry.");
+    } finally {
+      setActingOn(null);
+    }
+  };
+
+  const newCount = inquiries.filter((i) => i.status === "new").length;
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
+      <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+        <div>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-serif text-timber-darkwood">Customer Inquiries</h2>
+            {newCount > 0 && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                {newCount} new
+              </span>
+            )}
+          </div>
+          <p className="text-gray-500 text-sm mt-1">
+            Messages submitted via the contact form on timberteak.com/contact.
+          </p>
+        </div>
+      </div>
+
+      {listError ? (
+        <div className="p-6">
+          <p className="text-red-600 font-medium mb-1">Couldn&apos;t load inquiries</p>
+          <p className="text-gray-500 text-sm">{listError}</p>
+        </div>
+      ) : inquiries.length === 0 ? (
+        <div className="p-12 text-center text-gray-500 italic">No inquiries received yet.</div>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {inquiries.map((inq) => (
+            <div key={inq.id} className="p-6 hover:bg-gray-50/50 transition-colors">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 mb-3">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-timber-darkwood text-base">{inq.name}</span>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        inq.status === "handled"
+                          ? "bg-gray-100 text-gray-600"
+                          : "bg-emerald-100 text-emerald-800"
+                      }`}
+                    >
+                      {inq.status === "handled" ? "HANDLED" : "NEW"}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {inq.createdAt ? new Date(inq.createdAt).toLocaleString("en-IN") : ""}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-4 text-xs text-gray-500 mt-1">
+                    <a href={`mailto:${inq.email}`} className="text-timber-teal hover:underline font-medium">
+                      {inq.email}
+                    </a>
+                    {inq.phone && (
+                      <a href={`tel:${inq.phone}`} className="hover:underline">
+                        {inq.phone}
+                      </a>
+                    )}
+                    <span className="text-gray-600 font-medium bg-gray-100 px-2 py-0.5 rounded">
+                      {inq.subject}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => toggleStatus(inq)}
+                    disabled={actingOn === inq.id}
+                    className="text-xs px-3 py-1.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+                  >
+                    {inq.status === "handled" ? "Mark New" : "Mark Handled"}
+                  </button>
+                  <button
+                    onClick={() => deleteInquiry(inq)}
+                    disabled={actingOn === inq.id}
+                    className="text-xs px-3 py-1.5 rounded border border-red-200 text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-sm text-gray-700 bg-gray-50/80 p-3.5 rounded-md border border-gray-100 whitespace-pre-wrap leading-relaxed">
+                {inq.message}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Admin panel
 // ---------------------------------------------------------------------------
 export default function AdminPanel() {
@@ -1007,6 +1166,7 @@ export default function AdminPanel() {
         </div>
 
         <OrdersSection notify={notify} user={user} />
+        <InquiriesSection notify={notify} user={user} />
 
         <div className="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-col md:flex-row gap-3 md:items-center">
           <input

@@ -31,11 +31,12 @@ export function Footer() {
           <div>
             <h4 className="font-serif text-lg text-white mb-6">Shop</h4>
             <ul className="space-y-3 text-sm text-timber-beige/80">
-              <li><Link href="/categories/tables" className="hover:text-white transition-colors interactive">Dining Tables</Link></li>
-              <li><Link href="/categories/chairs" className="hover:text-white transition-colors interactive">Chairs & Seating</Link></li>
-              <li><Link href="/categories/beds" className="hover:text-white transition-colors interactive">Bedroom Furniture</Link></li>
-              <li><Link href="/categories/cabinets" className="hover:text-white transition-colors interactive">Storage & Cabinets</Link></li>
-              <li><Link href="/categories/outdoor" className="hover:text-white transition-colors interactive">Outdoor Wood</Link></li>
+              <li><Link href="/shop?category=Chairs" className="hover:text-white transition-colors interactive">Chairs &amp; Seating</Link></li>
+              <li><Link href="/shop?category=Cots" className="hover:text-white transition-colors interactive">Cots &amp; Beds</Link></li>
+              <li><Link href="/shop?category=Wardrobes" className="hover:text-white transition-colors interactive">Storage &amp; Wardrobes</Link></li>
+              <li><Link href="/shop?category=Sofas" className="hover:text-white transition-colors interactive">Sofas &amp; Living</Link></li>
+              <li><Link href="/shop?category=Outdoor" className="hover:text-white transition-colors interactive">Outdoor Wood</Link></li>
+              <li><Link href="/categories" className="hover:text-white transition-colors interactive">All Categories</Link></li>
               <li><Link href="/shop" className="hover:text-white transition-colors interactive">View All Products</Link></li>
             </ul>
           </div>
@@ -45,7 +46,7 @@ export function Footer() {
             <h4 className="font-serif text-lg text-white mb-6">Company</h4>
             <ul className="space-y-3 text-sm text-timber-beige/80">
               <li><Link href="/about" className="hover:text-white transition-colors interactive">Our Story</Link></li>
-              <li><Link href="/projects" className="hover:text-white transition-colors interactive">Projects & Gallery</Link></li>
+              <li><Link href="/projects" className="hover:text-white transition-colors interactive">Projects &amp; Gallery</Link></li>
               <li><Link href="/sustainability" className="hover:text-white transition-colors interactive">Sustainability</Link></li>
               <li><Link href="/care" className="hover:text-white transition-colors interactive">Wood Care Guide</Link></li>
               <li><Link href="/contact" className="hover:text-white transition-colors interactive">Contact Us</Link></li>
@@ -55,11 +56,12 @@ export function Footer() {
 
         {/* Bottom */}
         <div className="pt-8 border-t border-timber-beige/10 flex flex-col md:flex-row justify-between items-center text-xs text-timber-beige/60">
-          <p>&copy; {new Date().getFullYear()} Timber Furniture Co. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Timber, House of Exclusive. All rights reserved.</p>
           <p className="mt-4 md:mt-0 text-timber-beige/50">Created by <span className="text-timber-beige/80 font-medium">Tagverse</span></p>
-          <div className="flex space-x-6 mt-4 md:mt-0">
+          <div className="flex flex-wrap gap-4 md:gap-6 mt-4 md:mt-0">
             <Link href="/privacy" className="hover:text-white transition-colors interactive">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-white transition-colors interactive">Terms of Service</Link>
+            <Link href="/refund" className="hover:text-white transition-colors interactive">Refund &amp; Shipping</Link>
           </div>
         </div>
       </div>

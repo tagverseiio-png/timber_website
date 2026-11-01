@@ -288,7 +288,7 @@ export async function shippingQuote(req, res, next) {
     // Optional cart lines: only {id: string, qty: int 1–10}, max 50.
     const rawItems = Array.isArray(req.body?.items) ? req.body.items.slice(0, 50) : [];
     const lines = rawItems
-      .map((line, i) => {
+      .map((line) => {
         const id = typeof line?.id === "string" ? line.id.trim() : "";
         const qty = Number(line?.qty);
         if (!id || id.length > 200 || !Number.isInteger(qty) || qty < 1 || qty > 10) return null;

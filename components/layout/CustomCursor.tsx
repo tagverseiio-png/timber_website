@@ -1,12 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { motion, useMotionValue, useSpring } from "framer-motion";
 import { useCursorStore } from "@/store/useCursorStore";
+import { useHydrated } from "@/lib/useHydrated";
+
+// Pointer capability via a live media-query subscription — the React-blessed
+// replacement for setState-in-effect mount detection (SSR snapshot: false).
+const COARSE = "(pointer: coarse)";
+function subscribePointer(callback: () => void) {
+  const mq = window.matchMedia(COARSE);
+  mq.addEventListener("change", callback);
+  return () => mq.removeEventListener("change", callback);
+}
 
 export function CustomCursor() {
   const { text, isHovering } = useCursorStore();
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const hydrated = useHydrated();
+  const isTouchDevice = useSyncExternalStore(
+    subscribePointer,
+    () => window.matchMedia(COARSE).matches,
+    () => false
+  );
   const [isVisible, setIsVisible] = useState(false);
 
   // Motion values for smooth interpolation
@@ -19,16 +34,12 @@ export function CustomCursor() {
   const smoothY = useSpring(mouseY, springConfig);
 
   useEffect(() => {
-    // Check for touch device
-    if (window.matchMedia("(pointer: coarse)").matches) {
-      setIsTouchDevice(true);
-      return;
-    }
+    if (isTouchDevice) return; // touch devices keep the native cursor
 
     const updateMousePosition = (e: MouseEvent) => {
       mouseX.set(e.clientX);
       mouseY.set(e.clientY);
-      if (!isVisible) setIsVisible(true);
+      setIsVisible(true); // idempotent — React bails out when the value is unchanged
     };
 
     const handleMouseLeave = () => setIsVisible(false);
@@ -43,9 +54,9 @@ export function CustomCursor() {
       document.body.removeEventListener("mouseleave", handleMouseLeave);
       document.body.removeEventListener("mouseenter", handleMouseEnter);
     };
-  }, [mouseX, mouseY, isVisible]);
+  }, [mouseX, mouseY, isTouchDevice]);
 
-  if (isTouchDevice || !isVisible) return null;
+  if (!hydrated || isTouchDevice || !isVisible) return null;
 
   const hasText = text.length > 0;
   const cursorSize = hasText ? 80 : (isHovering ? 48 : 16);
@@ -70,7 +81,7 @@ export function CustomCursor() {
       transition={{ type: "tween", ease: "circOut", duration: 0.2 }}
     >
       {hasText && (
-        <motion.span 
+        <motion.span
           initial={{ opacity: 0, scale: 0.5 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.5 }}

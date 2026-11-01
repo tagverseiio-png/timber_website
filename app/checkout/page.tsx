@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signInAnonymously } from "firebase/auth";
+import { signInAnonymously, onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { env } from "@/lib/env";
 import { useCartStore, type CartLine } from "@/store/useCartStore";
@@ -11,6 +11,7 @@ import { useCatalog } from "@/lib/products/catalog";
 import type { CatalogProduct } from "@/lib/products/types";
 import { formatPrice } from "@/lib/money";
 import { loadRazorpayScript, postToPaymentApi, type RazorpaySuccess } from "@/lib/razorpay";
+import { getCustomerProfile } from "@/lib/auth/customerAuth";
 
 /**
  * Checkout: sends ONLY [{id, qty}] to the VM along with customer + address
@@ -74,6 +75,35 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [paymentModalError, setPaymentModalError] = useState<string | null>(null);
   const [addr, setAddr] = useState<AddressForm>(EMPTY_ADDRESS);
+  const [customerUser, setCustomerUser] = useState<User | null>(null);
+
+  // Auto-populate customer info and default address if logged in
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser && !currentUser.isAnonymous) {
+        setCustomerUser(currentUser);
+        try {
+          const profile = await getCustomerProfile(currentUser.uid);
+          setAddr((prev) => ({
+            ...prev,
+            name: prev.name || profile?.name || currentUser.displayName || "",
+            email: prev.email || profile?.email || currentUser.email || "",
+            phone: prev.phone || profile?.phone || "",
+            line1: prev.line1 || profile?.address?.line1 || "",
+            line2: prev.line2 || profile?.address?.line2 || "",
+            city: prev.city || profile?.address?.city || "",
+            state: prev.state || profile?.address?.state || "",
+            pincode: prev.pincode || profile?.address?.pincode || "",
+          }));
+        } catch {
+          // ignore
+        }
+      } else {
+        setCustomerUser(null);
+      }
+    });
+    return () => unsub();
+  }, []);
   const [quote, setQuote] = useState<{
     ok: boolean;
     note: string;
@@ -142,9 +172,6 @@ export default function CheckoutPage() {
   // disappeared above. Paying must be blocked — the server would only 400
   // AFTER the user filled the whole address form.
   const ghostLines = detailed.length !== lines.length;
-  const ghostIds = lines
-    .filter((l) => !detailed.some((d) => d.line.id === l.id))
-    .map((l) => l.id);
 
   const pay = async () => {
     setBusy(true);
@@ -252,6 +279,20 @@ export default function CheckoutPage() {
     <div className="bg-timber-beige min-h-screen pt-10 pb-32">
       <div className="container mx-auto px-6 md:px-12 max-w-3xl">
         <h1 className="font-serif text-4xl md:text-5xl text-timber-darkwood mb-8">Checkout</h1>
+
+        {!customerUser && (
+          <div className="mb-6 p-4 rounded-xl bg-white/80 border border-timber-darkwood/10 text-xs flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+            <span className="text-timber-muted">
+              Already have an account? Sign in for saved addresses and live order tracking.
+            </span>
+            <Link
+              href="/account/login?redirect=/checkout"
+              className="text-timber-teal font-semibold hover:underline shrink-0"
+            >
+              Sign In &rarr;
+            </Link>
+          </div>
+        )}
 
         {catalogLoading ? (
           <p className="text-timber-muted">Loading order summary…</p>

@@ -59,8 +59,9 @@ export function useCatalog() {
       );
       return () => unsubscribe();
     } catch {
-      setRows(fallbackCatalog);
-      setLoading(false);
+      // Rows are already initialized to fallbackCatalog. Defer setLoading to avoid
+      // synchronous setState in effect body (react-hooks/set-state-in-effect).
+      queueMicrotask(() => setLoading(false));
     }
   }, []);
 

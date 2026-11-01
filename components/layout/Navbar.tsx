@@ -2,16 +2,21 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Search, ShoppingBag, Menu, X, Heart } from "lucide-react";
+import { Search, ShoppingBag, Menu, X, Heart, User as UserIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { useCartStore } from "@/store/useCartStore";
+import { useWishlistStore } from "@/store/useWishlistStore";
+import { onAuthStateChanged, type User } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const pathname = usePathname();
   const cartCount = useCartStore((s) => s.count());
+  const wishlistCount = useWishlistStore((s) => s.count());
 
   useEffect(() => {
     const handleScroll = () => {
@@ -19,6 +24,18 @@ export function Navbar() {
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (currentUser) => {
+      // Don't treat anonymous guests as signed-in customer accounts
+      if (currentUser && !currentUser.isAnonymous) {
+        setUser(currentUser);
+      } else {
+        setUser(null);
+      }
+    });
+    return () => unsub();
   }, []);
 
   const navLinks = [
@@ -65,12 +82,52 @@ export function Navbar() {
 
         {/* Icons */}
         <div className="flex items-center space-x-5 text-timber-darkwood">
-          <button aria-label="Search" className="hover:text-timber-teal transition-colors interactive">
+          <Link href="/shop" aria-label="Search Catalog" className="hover:text-timber-teal transition-colors interactive">
             <Search size={20} strokeWidth={1.5} />
-          </button>
-          <Link href="/wishlist" aria-label="Wishlist" className="hover:text-timber-teal transition-colors interactive hidden sm:block">
-            <Heart size={20} strokeWidth={1.5} />
           </Link>
+
+          {/* Wishlist */}
+          <Link href="/wishlist" aria-label="Wishlist" className="hover:text-timber-teal transition-colors relative interactive hidden sm:block">
+            <Heart size={20} strokeWidth={1.5} />
+            {wishlistCount > 0 && (
+              <span className="absolute -top-1 -right-1.5 bg-timber-teal text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                {wishlistCount > 99 ? "99+" : wishlistCount}
+              </span>
+            )}
+          </Link>
+
+          {/* Customer Account */}
+          <Link
+            href={user ? "/account" : "/account/login"}
+            aria-label={user ? "My Account" : "Sign In with Google"}
+            title={user ? `My Account (${user.displayName || user.email})` : "Sign In with Google"}
+            className="hover:text-timber-teal transition-colors relative interactive flex items-center gap-2"
+          >
+            <div className="relative">
+              {user?.photoURL ? (
+                <Image
+                  src={user.photoURL}
+                  alt={user.displayName || "Account"}
+                  width={24}
+                  height={24}
+                  className="w-6 h-6 rounded-full object-cover border border-timber-darkwood/20"
+                  unoptimized
+                />
+              ) : (
+                <UserIcon size={20} strokeWidth={1.5} />
+              )}
+              {user && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-600 ring-2 ring-white" />
+              )}
+            </div>
+            {user && (
+              <span className="text-xs font-medium hidden lg:inline max-w-[90px] truncate">
+                {user.displayName?.split(" ")[0] || "Account"}
+              </span>
+            )}
+          </Link>
+
+          {/* Cart */}
           <Link href="/cart" aria-label="Cart" className="hover:text-timber-teal transition-colors relative interactive">
             <ShoppingBag size={20} strokeWidth={1.5} />
             {cartCount > 0 && (
@@ -105,6 +162,28 @@ export function Navbar() {
                 {link.name}
               </Link>
             ))}
+
+            <Link
+              href="/wishlist"
+              className="text-lg tracking-wide text-timber-darkwood border-b border-timber-darkwood/5 pb-2 flex justify-between items-center"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span>Wishlist</span>
+              {wishlistCount > 0 && (
+                <span className="text-xs font-bold px-2 py-0.5 bg-timber-teal text-white rounded-full">
+                  {wishlistCount}
+                </span>
+              )}
+            </Link>
+
+            <Link
+              href={user ? "/account" : "/account/login"}
+              className="text-lg tracking-wide text-timber-teal font-medium pb-2 flex items-center gap-2"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <UserIcon size={18} />
+              <span>{user ? `Account (${user.displayName || "Orders"})` : "Sign In / Register"}</span>
+            </Link>
           </nav>
         </div>
       )}
