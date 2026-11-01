@@ -247,6 +247,7 @@ export async function shippingQuote(req, res, next) {
     if (/^[1-9]\d{5}$/.test(c.pickupPincode)) body.pickup_postcode = c.pickupPincode;
     else body.default = "1";
     body.weight = (config.shiprocket.defaultWeightGrams / 1000) || 0.5;
+    body.md = "1"; // mandatory: mode of delivery — 1 = forward (0 = return)
 
     const data = await srRequest("/courier/serviceability", body, { method: "GET" });
     const couriers = (data?.data?.available_courier_companies ?? []).map((co) => ({
