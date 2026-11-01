@@ -12,7 +12,7 @@ export function HeroSection() {
   const shouldReduceMotion = useReducedMotion();
 
   // Scroll Parallax
-  const { scrollYProgress, scrollY } = useScroll({
+  const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ["start start", "end start"],
   });
@@ -22,7 +22,6 @@ export function HeroSection() {
   const logsFrontScrollY = useTransform(scrollYProgress, [0, 1], [0, -100]);
   const logsBackScrollY = useTransform(scrollYProgress, [0, 1], [0, 50]);
   const opacityTransform = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
-  const scrollCueOpacity = useTransform(scrollY, [0, 150], [1, 0]);
 
   // Mouse Parallax & Lighting
   const mouseX = useMotionValue(0);
@@ -235,28 +234,6 @@ export function HeroSection() {
             <ArrowRight size={16} className="opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" />
           </Link>
         </motion.div>
-      </motion.div>
-
-      {/* Scroll Indicator */}
-      <motion.div
-        style={{ opacity: scrollCueOpacity }}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-10"
-      >
-        <motion.span variants={fadeVariants} className="text-[10px] tracking-[0.2em] text-timber-beige/70 uppercase">Scroll to Explore</motion.span>
-        <div className="w-[1px] h-16 bg-timber-beige/30 relative flex justify-center">
-          <motion.div
-            animate={{
-              y: ["0%", "200%", "0%"],
-              scale: [1, 1.2, 1],
-              opacity: [0.5, 1, 0.5]
-            }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-0 w-3 h-3 rounded-full border-2 border-timber-beige bg-timber-darkwood shadow-[0_0_10px_rgba(245,240,230,0.5)] -translate-x-1/2"
-          >
-            {/* Inner wood ring dot */}
-            <div className="absolute inset-0 m-auto w-1 h-1 rounded-full bg-timber-beige opacity-80" />
-          </motion.div>
-        </div>
       </motion.div>
     </motion.section>
   );
