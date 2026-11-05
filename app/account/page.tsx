@@ -133,8 +133,12 @@ export default function CustomerAccountPage() {
         return <span className="px-3 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded-full">Out for Delivery</span>;
       case "delivered":
         return <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">Delivered</span>;
+      case "cancelled":
+        return <span className="px-3 py-1 bg-rose-100 text-rose-800 text-xs font-semibold rounded-full">Cancelled</span>;
+      case "out_of_stock":
+        return <span className="px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full">Out of Stock</span>;
       case "refunded":
-        return <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">Refunded</span>;
+        return <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">Refunded</span>;
       default:
         return <span className="px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full">Payment Pending</span>;
     }
@@ -243,8 +247,11 @@ export default function CustomerAccountPage() {
             ) : (
               orders.map((order) => {
                 const awb = order.shiprocket?.awb;
-                const courier = order.shiprocket?.courier;
-                const trackingUrl = order.shiprocket?.trackingUrl || (awb ? `https://shiprocket.co/tracking/${awb}` : null);
+                const courier = order.shiprocket?.courier || order.shiprocket?.courierName;
+                const trackingUrl =
+                  order.shiprocket?.trackingUrl ||
+                  order.shiprocket?.tracking_url ||
+                  (awb ? `https://shiprocket.co/tracking/${encodeURIComponent(awb.trim())}` : null);
 
                 return (
                   <div
@@ -292,7 +299,7 @@ export default function CustomerAccountPage() {
                               Shipment in Transit
                             </span>
                             <p className="text-sm font-medium text-timber-darkwood">
-                              {courier ? `${courier} · ` : ""}AWB: <span className="font-mono">{awb}</span>
+                              {courier ? `${courier} · ` : ""}AWB: <span className="font-mono font-semibold">{awb}</span>
                             </p>
                           </div>
                         </div>
@@ -302,17 +309,47 @@ export default function CustomerAccountPage() {
                             href={trackingUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-timber-teal text-white text-xs font-semibold uppercase tracking-wider rounded-full hover:bg-timber-darkwood transition shrink-0"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-timber-teal text-white text-xs font-semibold uppercase tracking-wider rounded-full hover:bg-timber-darkwood transition shrink-0 shadow-sm"
                           >
-                            <span>Track Package</span>
+                            <span>Track on Shiprocket</span>
                             <ExternalLink size={13} />
                           </a>
                         )}
                       </div>
-                    ) : order.status === "paid" ? (
-                      <div className="my-4 p-4 rounded-xl bg-amber-50/60 border border-amber-200/60 text-amber-800 text-xs flex items-center gap-2">
-                        <Clock size={15} className="shrink-0" />
-                        <span>Order confirmed. Our workshop is preparing your shipment for crating and courier pickup.</span>
+                    ) : order.status === "cancelled" ? (
+                      <div className="my-4 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
+                        <AlertCircle size={16} className="shrink-0 text-rose-600 mt-0.5" />
+                        <div>
+                          <p className="font-semibold">Order Cancelled</p>
+                          <p className="text-rose-700 mt-0.5">
+                            {order.adminNotes || "This order was cancelled. If you need any assistance or have questions, please reach out to our concierge."}
+                          </p>
+                        </div>
+                      </div>
+                    ) : order.status === "out_of_stock" ? (
+                      <div className="my-4 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
+                        <AlertCircle size={16} className="shrink-0 text-amber-700 mt-0.5" />
+                        <div>
+                          <p className="font-semibold">Item Seasoning / Out of Stock</p>
+                          <p className="text-amber-800 mt-0.5">
+                            {order.adminNotes || "This piece is temporarily undergoing timber seasoning in our workshop. Our team is actively crafting your unit and will reach out with shipping details."}
+                          </p>
+                        </div>
+                      </div>
+                    ) : order.status === "refunded" ? (
+                      <div className="my-4 p-4 rounded-xl bg-yellow-50 border border-yellow-200 text-yellow-900 text-xs flex items-start gap-2.5">
+                        <CheckCircle2 size={16} className="shrink-0 text-yellow-700 mt-0.5" />
+                        <div>
+                          <p className="font-semibold">Refund Processed</p>
+                          <p className="text-yellow-800 mt-0.5">
+                            {order.adminNotes || "A refund has been issued for this order. It will reflect back in your original payment account within 3-5 business days."}
+                          </p>
+                        </div>
+                      </div>
+                    ) : order.status === "paid" || order.status === "processing" ? (
+                      <div className="my-4 p-4 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-800 text-xs flex items-center gap-2">
+                        <Clock size={15} className="shrink-0 text-emerald-600" />
+                        <span>Order confirmed. Our master craftsmen are preparing your solid wood furniture for crating and courier pickup.</span>
                       </div>
                     ) : null}
 

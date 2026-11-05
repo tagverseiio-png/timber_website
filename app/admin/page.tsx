@@ -56,6 +56,14 @@ import {
   RotateCcw,
   UploadCloud,
   Trash2,
+  Edit3,
+  Truck,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  X,
+  Save,
 } from "lucide-react";
 
 const ADMIN_PAGE_SIZE = 12;
@@ -383,23 +391,28 @@ function ProductModal({
 }
 
 // ---------------------------------------------------------------------------
-// Orders panel (semi-auto fulfillment): latest 50 live orders with
-// "Approve & Ship" → POST /fulfill on the payment VM (creates Shiprocket
-// shipment + AWB). Statuses then advance via the Shiprocket webhook.
+// Orders Management Module: Full CRUD, Search, Filter, Direct Status Updates,
+// Shiprocket Tracking Links, Manual Order Creation, and optional API dispatch.
 // ---------------------------------------------------------------------------
 interface OrderRow {
   id: string;
   status: string;
   amountPaise: number;
   currency: string;
-  items?: { id: string; name: string; qty: number; pricePaise: number }[];
+  receipt?: string;
+  userId?: string;
+  adminNotes?: string;
+  items?: { id?: string; name: string; qty: number; pricePaise: number }[];
   customer?: { name?: string; email?: string; phone?: string };
   address?: { line1?: string; line2?: string; city?: string; state?: string; pincode?: string };
   shiprocket?: {
-    orderId?: string;
-    shipmentId?: string;
+    orderId?: string | number;
+    shipmentId?: string | number;
     awb?: string;
     courierName?: string;
+    courier?: string;
+    trackingUrl?: string;
+    tracking_url?: string;
     state?: string;
     createdAt?: number;
   };
@@ -407,20 +420,35 @@ interface OrderRow {
   updatedAt?: number;
 }
 
-const ORDER_STATUS_STYLES: Record<string, string> = {
-  pending: "bg-gray-100 text-gray-700",
-  paid: "bg-green-100 text-green-800",
-  processing: "bg-blue-100 text-blue-800",
-  shipped: "bg-indigo-100 text-indigo-800",
-  out_for_delivery: "bg-indigo-100 text-indigo-800",
-  delivered: "bg-emerald-100 text-emerald-800",
-  failed: "bg-red-100 text-red-700",
-  refunded: "bg-yellow-100 text-yellow-800",
-  rto: "bg-orange-100 text-orange-800",
-};
+const AVAILABLE_ORDER_STATUSES: { id: string; label: string; badgeCls: string }[] = [
+  { id: "paid", label: "Paid & Confirmed", badgeCls: "bg-emerald-100 text-emerald-800 border-emerald-300" },
+  { id: "processing", label: "In Production / Packing", badgeCls: "bg-blue-100 text-blue-800 border-blue-300" },
+  { id: "shipped", label: "Shipped / In Transit", badgeCls: "bg-indigo-100 text-indigo-800 border-indigo-300" },
+  { id: "out_for_delivery", label: "Out for Delivery", badgeCls: "bg-purple-100 text-purple-800 border-purple-300" },
+  { id: "delivered", label: "Delivered", badgeCls: "bg-green-100 text-green-800 border-green-300" },
+  { id: "out_of_stock", label: "Out of Stock / Seasoning", badgeCls: "bg-amber-100 text-amber-800 border-amber-300" },
+  { id: "cancelled", label: "Cancelled", badgeCls: "bg-rose-100 text-rose-800 border-rose-300" },
+  { id: "refunded", label: "Refunded", badgeCls: "bg-yellow-100 text-yellow-800 border-yellow-300" },
+  { id: "pending", label: "Pending Payment", badgeCls: "bg-gray-100 text-gray-700 border-gray-300" },
+  { id: "failed", label: "Payment Failed", badgeCls: "bg-red-100 text-red-700 border-red-300" },
+];
 
 function statusLabel(s: string): string {
-  return s.replace(/_/g, " ").toUpperCase();
+  const match = AVAILABLE_ORDER_STATUSES.find((st) => st.id === s);
+  return match ? match.label : s.replace(/_/g, " ").toUpperCase();
+}
+
+function getOrderBadgeCls(s: string): string {
+  const match = AVAILABLE_ORDER_STATUSES.find((st) => st.id === s);
+  return match ? match.badgeCls : "bg-gray-100 text-gray-700 border-gray-200";
+}
+
+function getOrderTrackingUrl(o: OrderRow): string | null {
+  const awb = (o.shiprocket?.awb ?? "").trim();
+  if (o.shiprocket?.trackingUrl?.trim()) return o.shiprocket.trackingUrl.trim();
+  if (o.shiprocket?.tracking_url?.trim()) return o.shiprocket.tracking_url.trim();
+  if (awb) return `https://shiprocket.co/tracking/${encodeURIComponent(awb)}`;
+  return null;
 }
 
 function OrdersSection({
@@ -436,15 +464,42 @@ function OrdersSection({
   const [listError, setListError] = useState<string | null>(null);
   const [actingOn, setActingOn] = useState<string | null>(null);
 
+  // Search & Filtering State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 15;
+
+  // Edit Order Modal State
+  const [editingOrder, setEditingOrder] = useState<OrderRow | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Create Manual Order Modal State
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [creatingOrder, setCreatingOrder] = useState(false);
+  const [newOrder, setNewOrder] = useState({
+    id: "",
+    customerName: "",
+    customerEmail: "",
+    customerPhone: "",
+    addressLine1: "",
+    addressLine2: "",
+    city: "",
+    state: "",
+    pincode: "",
+    status: "paid",
+    items: [{ name: "Solid Teak Dining Chair", qty: 1, priceRupees: 18500 }],
+    courier: "",
+    awb: "",
+    adminNotes: "",
+  });
+
+  // 1. Full Database Subscription (No 50 Limit)
   useEffect(() => {
     if (!user) return;
-    const ordersQuery = query(
-      ref(database, "orders"),
-      orderByChild("createdAt"),
-      limitToLast(50)
-    );
+    const ordersRef = ref(database, "orders");
     const unsub = onValue(
-      ordersQuery,
+      ordersRef,
       (snap) => {
         const data = (snap.val() ?? {}) as Record<string, Omit<OrderRow, "id">>;
         const rows = Object.entries(data)
@@ -459,13 +514,221 @@ function OrdersSection({
     return () => unsub();
   }, [user, onCountsChange]);
 
-  /** Semi-auto: admin reviews a paid order → confirms → VM creates the shipment. */
+  // Compute status counts for filter pills
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: orders.length };
+    for (const o of orders) {
+      const st = o.status || "pending";
+      counts[st] = (counts[st] || 0) + 1;
+    }
+    return counts;
+  }, [orders]);
+
+  // Filtered orders based on search query & status filter
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => {
+      if (statusFilter !== "all" && (o.status || "pending") !== statusFilter) {
+        return false;
+      }
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      const matchId = o.id.toLowerCase().includes(q) || (o.receipt || "").toLowerCase().includes(q);
+      const matchCustomer =
+        (o.customer?.name || "").toLowerCase().includes(q) ||
+        (o.customer?.email || "").toLowerCase().includes(q) ||
+        (o.customer?.phone || "").toLowerCase().includes(q);
+      const matchAwb =
+        (o.shiprocket?.awb || "").toLowerCase().includes(q) ||
+        (o.shiprocket?.courierName || "").toLowerCase().includes(q) ||
+        (o.shiprocket?.courier || "").toLowerCase().includes(q);
+      const matchAddress =
+        (o.address?.city || "").toLowerCase().includes(q) ||
+        (o.address?.state || "").toLowerCase().includes(q) ||
+        (o.address?.pincode || "").toLowerCase().includes(q);
+      const matchNotes = (o.adminNotes || "").toLowerCase().includes(q);
+      return matchId || matchCustomer || matchAwb || matchAddress || matchNotes;
+    });
+  }, [orders, statusFilter, searchQuery]);
+
+  // Pagination calculation
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedOrders = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredOrders.slice(start, start + pageSize);
+  }, [filteredOrders, safePage, pageSize]);
+
+  // 2. Direct Frontend Quick Status Update (Firebase direct write)
+  const handleQuickStatusChange = async (orderId: string, newStatus: string) => {
+    try {
+      await update(ref(database, `orders/${orderId}`), {
+        status: newStatus,
+        updatedAt: serverTimestamp(),
+      });
+      notify("success", `Order ${orderId.slice(0, 10)} marked as ${statusLabel(newStatus)}.`);
+    } catch (err) {
+      notify("error", err instanceof Error ? err.message : "Failed to update status.");
+    }
+  };
+
+  // 3. Delete Order (Delete option)
+  const handleDeleteOrder = async (orderId: string) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete order "${orderId}"?\n\nThis will remove it from the database.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await remove(ref(database, `orders/${orderId}`));
+      notify("success", `Order ${orderId} deleted.`);
+    } catch (err) {
+      notify("error", err instanceof Error ? err.message : "Failed to delete order.");
+    }
+  };
+
+  // 4. Save Edited Order Modal
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingOrder) return;
+    setSavingEdit(true);
+    try {
+      const awbTrimmed = editingOrder.shiprocket?.awb?.trim() || "";
+      const courierTrimmed =
+        editingOrder.shiprocket?.courierName?.trim() ||
+        editingOrder.shiprocket?.courier?.trim() ||
+        "";
+      const customTrackingUrl = editingOrder.shiprocket?.trackingUrl?.trim();
+      const effectiveTrackingUrl =
+        customTrackingUrl || (awbTrimmed ? `https://shiprocket.co/tracking/${encodeURIComponent(awbTrimmed)}` : "");
+
+      const updates: Record<string, unknown> = {
+        status: editingOrder.status,
+        updatedAt: serverTimestamp(),
+        adminNotes: editingOrder.adminNotes || "",
+        amountPaise: Number(editingOrder.amountPaise) || 0,
+        customer: {
+          name: editingOrder.customer?.name?.trim() || "",
+          email: editingOrder.customer?.email?.trim() || "",
+          phone: editingOrder.customer?.phone?.trim() || "",
+        },
+        address: {
+          line1: editingOrder.address?.line1?.trim() || "",
+          line2: editingOrder.address?.line2?.trim() || "",
+          city: editingOrder.address?.city?.trim() || "",
+          state: editingOrder.address?.state?.trim() || "",
+          pincode: editingOrder.address?.pincode?.trim() || "",
+        },
+        shiprocket: {
+          ...editingOrder.shiprocket,
+          awb: awbTrimmed,
+          courierName: courierTrimmed,
+          courier: courierTrimmed,
+          trackingUrl: effectiveTrackingUrl,
+          tracking_url: effectiveTrackingUrl,
+        },
+      };
+
+      await update(ref(database, `orders/${editingOrder.id}`), updates);
+      notify("success", `Order ${editingOrder.id} updated successfully.`);
+      setEditingOrder(null);
+    } catch (err) {
+      notify("error", err instanceof Error ? err.message : "Failed to save order.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // 5. Create Manual / Custom Order
+  const handleCreateOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOrder.customerName.trim()) {
+      notify("error", "Customer name is required.");
+      return;
+    }
+    setCreatingOrder(true);
+    try {
+      const fallbackId = "ord_man_" + Math.random().toString(36).substring(2, 9);
+      const orderId = newOrder.id.trim() || fallbackId;
+      const totalAmountPaise = newOrder.items.reduce(
+        (sum, it) => sum + (Number(it.priceRupees) || 0) * 100 * (Number(it.qty) || 1),
+        0
+      );
+
+      const awbTrimmed = newOrder.awb.trim();
+      const courierTrimmed = newOrder.courier.trim();
+      const trackingUrl = awbTrimmed ? `https://shiprocket.co/tracking/${encodeURIComponent(awbTrimmed)}` : "";
+
+      const orderData: Record<string, unknown> = {
+        id: orderId,
+        status: newOrder.status,
+        amountPaise: totalAmountPaise,
+        currency: "INR",
+        customer: {
+          name: newOrder.customerName.trim(),
+          email: newOrder.customerEmail.trim(),
+          phone: newOrder.customerPhone.trim(),
+        },
+        address: {
+          line1: newOrder.addressLine1.trim(),
+          line2: newOrder.addressLine2.trim(),
+          city: newOrder.city.trim(),
+          state: newOrder.state.trim(),
+          pincode: newOrder.pincode.trim(),
+        },
+        items: newOrder.items.map((it) => ({
+          name: it.name.trim() || "Bespoke Timber Furniture",
+          qty: Number(it.qty) || 1,
+          pricePaise: (Number(it.priceRupees) || 0) * 100,
+        })),
+        shiprocket: awbTrimmed || courierTrimmed
+          ? {
+              awb: awbTrimmed,
+              courierName: courierTrimmed,
+              courier: courierTrimmed,
+              trackingUrl: trackingUrl,
+              tracking_url: trackingUrl,
+            }
+          : {},
+        adminNotes: newOrder.adminNotes.trim(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      await set(ref(database, `orders/${orderId}`), orderData);
+      notify("success", `Manual order ${orderId} created successfully.`);
+      setIsCreateOpen(false);
+      setNewOrder({
+        id: "",
+        customerName: "",
+        customerEmail: "",
+        customerPhone: "",
+        addressLine1: "",
+        addressLine2: "",
+        city: "",
+        state: "",
+        pincode: "",
+        status: "paid",
+        items: [{ name: "Solid Teak Dining Chair", qty: 1, priceRupees: 18500 }],
+        courier: "",
+        awb: "",
+        adminNotes: "",
+      });
+    } catch (err) {
+      notify("error", err instanceof Error ? err.message : "Failed to create order.");
+    } finally {
+      setCreatingOrder(false);
+    }
+  };
+
+  /** Optional automated fulfillment via Payment VM */
   const approveAndShip = async (o: OrderRow) => {
     if (
       !window.confirm(
-        `Send order ${o.id} to Shiprocket?\n${o.customer?.name ?? ""} → ${o.address?.city ?? ""}, ${
+        `Send order ${o.id} to Shiprocket via Payment API?\n${o.customer?.name ?? ""} → ${o.address?.city ?? ""}, ${
           o.address?.pincode ?? ""
-        }\nThis assigns a courier and AWB.`
+        }\nThis assigns a courier and AWB automatically.`
       )
     )
       return;
@@ -491,9 +754,9 @@ function OrdersSection({
     }
   };
 
-  /** Admin refund: full amount, best-effort cancels the Shiprocket shipment. */
+  /** Optional automated refund via Razorpay VM */
   const refund = async (o: OrderRow) => {
-    if (!window.confirm(`Refund order ${o.id} for the full amount?`)) return;
+    if (!window.confirm(`Initiate gateway refund for order ${o.id} via Payment API?`)) return;
     if (!user) return;
     setActingOn(o.id);
     try {
@@ -514,124 +777,928 @@ function OrdersSection({
   const fmtDate = (ms?: number) =>
     ms ? new Date(ms).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—";
 
-  if (!env.paymentApiUrl) {
-    return (
-      <div className="bg-white p-6 rounded-lg shadow-sm mb-8 border-l-4 border-yellow-500">
-        <h2 className="text-xl font-serif text-timber-darkwood mb-2">Orders</h2>
-        <p className="text-gray-600 text-sm">
-          Set <code>NEXT_PUBLIC_PAYMENT_API_URL</code> (and the corresponding Vercel env var) once the payment
-          VM is live — shipping actions need it.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
-      <div className="p-6 border-b border-gray-100">
-        <h2 className="text-xl font-serif text-timber-darkwood">Recent Orders (latest 50)</h2>
-        <p className="text-gray-500 text-sm mt-1">
-          Paid orders need your review, then <em>Approve &amp; Ship</em> hands them to Shiprocket (semi-auto mode).
-        </p>
-      </div>
-      {listError ? (
-        <div className="p-6">
-          <p className="text-red-600 font-medium mb-1">Couldn&apos;t load orders</p>
-          <p className="text-gray-500 text-sm">{listError}</p>
+    <div className="bg-white rounded-2xl shadow-xs border border-gray-100 overflow-hidden space-y-6">
+      {/* Top Action & Summary Bar */}
+      <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50/50">
+        <div>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-serif font-bold text-timber-darkwood">Customer Orders &amp; Fulfillment</h2>
+            <span className="px-2.5 py-0.5 bg-timber-teal/10 text-timber-teal text-xs font-semibold rounded-full">
+              {orders.length} Total Orders
+            </span>
+          </div>
+          <p className="text-gray-500 text-xs mt-1">
+            Complete CRUD control: directly update statuses (cancel, out of stock, refund), edit shipping addresses, and manage live Shiprocket tracking links.
+          </p>
         </div>
-      ) : orders.length === 0 ? (
-        <div className="p-12 text-center text-gray-500 italic">No orders yet.</div>
+
+        <button
+          onClick={() => setIsCreateOpen(true)}
+          className="px-5 py-2.5 bg-timber-darkwood text-timber-beige hover:bg-timber-teal rounded-xl text-xs font-semibold uppercase tracking-wider transition flex items-center gap-2 cursor-pointer shadow-xs shrink-0"
+        >
+          <Plus size={15} />
+          <span>+ Create Manual Order</span>
+        </button>
+      </div>
+
+      {/* Search Bar & Status Filter Pills */}
+      <div className="px-6 space-y-4">
+        <div className="relative">
+          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search by Order ID, customer name, phone, email, AWB number, city..."
+            className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:outline-hidden focus:ring-2 focus:ring-timber-teal/20 focus:border-timber-teal transition"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setPage(1);
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 px-2 py-1"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Status Filter Pills */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <span className="text-xs font-medium text-gray-400 mr-1 flex items-center gap-1">
+            <Filter size={12} />
+            <span>Filter:</span>
+          </span>
+
+          <button
+            onClick={() => {
+              setStatusFilter("all");
+              setPage(1);
+            }}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+              statusFilter === "all"
+                ? "bg-timber-darkwood text-white shadow-2xs"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            <span>All</span>
+            <span className="px-1.5 py-0.2 bg-black/20 rounded-full text-[10px]">{statusCounts.all || 0}</span>
+          </button>
+
+          {AVAILABLE_ORDER_STATUSES.map((st) => {
+            const count = statusCounts[st.id] || 0;
+            if (count === 0 && !["paid", "processing", "shipped", "out_of_stock", "cancelled"].includes(st.id)) {
+              return null;
+            }
+            return (
+              <button
+                key={st.id}
+                onClick={() => {
+                  setStatusFilter(st.id);
+                  setPage(1);
+                }}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                  statusFilter === st.id
+                    ? "bg-timber-teal text-white shadow-2xs"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <span>{st.label}</span>
+                {count > 0 && (
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                      statusFilter === st.id ? "bg-black/20 text-white" : "bg-gray-200 text-gray-700"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Orders Table */}
+      {listError ? (
+        <div className="p-8 text-center text-red-600 bg-red-50/50 m-6 rounded-xl border border-red-200">
+          <p className="font-semibold mb-1">Couldn&apos;t load orders</p>
+          <p className="text-xs text-red-500">{listError}</p>
+        </div>
+      ) : filteredOrders.length === 0 ? (
+        <div className="p-16 text-center text-gray-500 italic">
+          {searchQuery || statusFilter !== "all"
+            ? "No orders match your search or filter criteria."
+            : "No customer orders recorded yet."}
+        </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50/80 border-y border-gray-100">
               <tr>
-                <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Order</th>
-                <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Customer</th>
-                <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Address</th>
-                <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Amount</th>
-                <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Status</th>
-                <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Shiprocket</th>
-                <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider text-right">Actions</th>
+                <th className="py-3.5 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Order &amp; Date</th>
+                <th className="py-3.5 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Customer</th>
+                <th className="py-3.5 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Shipping Address</th>
+                <th className="py-3.5 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Amount</th>
+                <th className="py-3.5 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Status (Quick Change)</th>
+                <th className="py-3.5 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Shiprocket Tracking</th>
+                <th className="py-3.5 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {orders.map((o) => (
-                <tr key={o.id} className="hover:bg-gray-50/50 transition align-top">
-                  <td className="py-4 px-6">
-                    <div className="font-mono text-xs text-gray-900 break-all">{o.id}</div>
-                    <div className="text-xs text-gray-500 mt-1">{fmtDate(o.createdAt)}</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {(o.items ?? []).map((i) => `${i.name}×${i.qty}`).join(", ")}
-                    </div>
-                  </td>
-                  <td className="py-4 px-6 text-sm text-gray-900">
-                    <div>{o.customer?.name}</div>
-                    <div className="text-xs text-gray-500">{o.customer?.phone}</div>
-                    {o.customer?.email && <div className="text-xs text-gray-500">{o.customer.email}</div>}
-                  </td>
-                  <td className="py-4 px-6 text-xs text-gray-700 max-w-xs">
-                    {[o.address?.line1, o.address?.line2, o.address?.city, o.address?.state, o.address?.pincode]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </td>
-                  <td className="py-4 px-6 font-medium text-gray-900 whitespace-nowrap">
-                    {formatPrice(o.amountPaise, o.currency ?? "INR")}
-                  </td>
-                  <td className="py-4 px-6">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                        ORDER_STATUS_STYLES[o.status] ?? "bg-gray-100 text-gray-700"
-                      }`}
-                    >
-                      {statusLabel(o.status ?? "pending")}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6 text-xs text-gray-700">
-                    {o.shiprocket?.orderId ? (
-                      <div>
-                        <div>SR #{o.shiprocket.orderId}</div>
-                        <div className="mt-1">
-                          {o.shiprocket.awb
-                            ? `AWB ${o.shiprocket.awb}${o.shiprocket.courierName ? ` · ${o.shiprocket.courierName}` : ""}`
-                            : "AWB pending"}
-                        </div>
-                        {o.shiprocket.state && (
-                          <div className="mt-1 text-gray-500">{statusLabel(o.shiprocket.state)}</div>
-                        )}
+              {paginatedOrders.map((o) => {
+                const trackingUrl = getOrderTrackingUrl(o);
+                return (
+                  <tr key={o.id} className="hover:bg-gray-50/60 transition align-top">
+                    {/* Order & Date */}
+                    <td className="py-4 px-6">
+                      <div className="font-mono text-xs font-bold text-timber-darkwood break-all">
+                        {o.receipt || o.id}
                       </div>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className="py-4 px-6 text-right whitespace-nowrap">
-                    {o.status === "paid" ? (
-                      <button
-                        onClick={() => approveAndShip(o)}
-                        disabled={actingOn === o.id}
-                        className="text-white bg-timber-teal hover:bg-timber-darkwood px-4 py-2 rounded-md text-sm font-medium transition disabled:opacity-50 mr-3"
+                      <div className="text-[11px] text-gray-500 mt-1 flex items-center gap-1">
+                        <Clock size={11} />
+                        <span>{fmtDate(o.createdAt)}</span>
+                      </div>
+                      <div className="text-xs text-gray-600 mt-2 space-y-0.5">
+                        {(o.items ?? []).map((i, idx) => (
+                          <div key={idx} className="font-medium">
+                            {i.name} <span className="text-timber-teal">×{i.qty}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {o.adminNotes && (
+                        <div className="mt-2 p-2 bg-amber-50/80 border border-amber-200/60 rounded-md text-[11px] text-amber-900 leading-snug">
+                          <strong>Note:</strong> {o.adminNotes}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Customer */}
+                    <td className="py-4 px-6 text-sm text-gray-900">
+                      <div className="font-medium text-timber-darkwood">{o.customer?.name || "Anonymous Customer"}</div>
+                      <div className="text-xs text-gray-500 font-mono mt-0.5">{o.customer?.phone || "—"}</div>
+                      {o.customer?.email && (
+                        <div className="text-xs text-gray-500 mt-0.5 break-all">{o.customer.email}</div>
+                      )}
+                    </td>
+
+                    {/* Shipping Address */}
+                    <td className="py-4 px-6 text-xs text-gray-700 max-w-xs leading-relaxed">
+                      {[o.address?.line1, o.address?.line2, o.address?.city, o.address?.state, o.address?.pincode]
+                        .filter(Boolean)
+                        .join(", ") || <span className="text-gray-400 italic">No address provided</span>}
+                    </td>
+
+                    {/* Amount */}
+                    <td className="py-4 px-6 font-semibold text-timber-darkwood whitespace-nowrap text-sm">
+                      {formatPrice(o.amountPaise, o.currency ?? "INR")}
+                    </td>
+
+                    {/* Status with Direct Frontend Selector */}
+                    <td className="py-4 px-6 space-y-2">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap ${getOrderBadgeCls(
+                          o.status
+                        )}`}
                       >
-                        {actingOn === o.id ? "Shipping…" : "Approve & Ship"}
-                      </button>
-                    ) : o.status === "processing" && !o.shiprocket?.awb ? (
-                      <span className="text-xs text-gray-500 mr-3">AWB assignment pending</span>
-                    ) : (
-                      <span className="text-xs text-gray-400 mr-3">—</span>
-                    )}
-                    {["paid", "processing", "shipped", "out_for_delivery", "rto"].includes(o.status) && (
-                      <button
-                        onClick={() => refund(o)}
-                        disabled={actingOn === o.id}
-                        className="text-red-600 hover:text-red-900 text-sm font-medium disabled:opacity-50"
-                      >
-                        {actingOn === o.id ? "Refunding…" : "Refund"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                        {statusLabel(o.status ?? "pending")}
+                      </span>
+
+                      {/* Direct Quick Changer */}
+                      <div>
+                        <select
+                          value={o.status || "pending"}
+                          onChange={(e) => handleQuickStatusChange(o.id, e.target.value)}
+                          className="text-xs font-semibold rounded-lg border border-gray-200 bg-white py-1 px-2 text-timber-darkwood focus:ring-1 focus:ring-timber-teal focus:border-timber-teal cursor-pointer shadow-2xs block w-full"
+                          title="Change status directly in database (cancel, out of stock, refund, shipped)"
+                        >
+                          {AVAILABLE_ORDER_STATUSES.map((st) => (
+                            <option key={st.id} value={st.id}>
+                              {st.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </td>
+
+                    {/* Shiprocket Tracking Link & Courier */}
+                    <td className="py-4 px-6 text-xs text-gray-700">
+                      {o.shiprocket?.awb ? (
+                        <div className="space-y-1.5">
+                          <div className="font-semibold text-timber-darkwood flex items-center gap-1.5">
+                            <Truck size={14} className="text-timber-teal shrink-0" />
+                            <span>{o.shiprocket.courierName || o.shiprocket.courier || "Shiprocket Courier"}</span>
+                          </div>
+                          <div className="font-mono text-[11px] text-gray-600">
+                            AWB: <span className="font-bold">{o.shiprocket.awb}</span>
+                          </div>
+                          {trackingUrl && (
+                            <div>
+                              <a
+                                href={trackingUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-timber-teal/10 hover:bg-timber-teal text-timber-teal hover:text-white rounded-lg text-[11px] font-semibold transition"
+                                title="Open live Shiprocket tracking"
+                              >
+                                <span>Track on Shiprocket</span>
+                                <ExternalLink size={11} />
+                              </a>
+                            </div>
+                          )}
+                          {o.shiprocket.state && (
+                            <div className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">
+                              Carrier: {statusLabel(o.shiprocket.state)}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <span className="text-gray-400 italic block text-xs">No AWB assigned</span>
+                          <button
+                            onClick={() => setEditingOrder(o)}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-timber-teal hover:text-timber-darkwood transition cursor-pointer"
+                          >
+                            <Plus size={11} />
+                            <span>Add AWB / Courier</span>
+                          </button>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Actions: Edit, Delete, Optional automated API */}
+                    <td className="py-4 px-6 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-2">
+                        {/* Edit order modal */}
+                        <button
+                          onClick={() => setEditingOrder(o)}
+                          className="p-2 text-timber-darkwood hover:text-timber-teal hover:bg-timber-teal/10 rounded-lg transition cursor-pointer"
+                          title="Edit order details, address, tracking, notes"
+                        >
+                          <Edit3 size={15} />
+                        </button>
+
+                        {/* Optional automated Shiprocket dispatch */}
+                        {env.paymentApiUrl && o.status === "paid" && (
+                          <button
+                            onClick={() => approveAndShip(o)}
+                            disabled={actingOn === o.id}
+                            className="text-white bg-timber-teal hover:bg-timber-darkwood px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-50 cursor-pointer shadow-2xs"
+                            title="Auto-dispatch via Payment VM to Shiprocket"
+                          >
+                            {actingOn === o.id ? "Shipping…" : "Shiprocket API"}
+                          </button>
+                        )}
+
+                        {/* Optional automated Razorpay refund */}
+                        {env.paymentApiUrl && ["paid", "processing", "shipped"].includes(o.status) && (
+                          <button
+                            onClick={() => refund(o)}
+                            disabled={actingOn === o.id}
+                            className="text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition disabled:opacity-50 cursor-pointer"
+                            title="Initiate gateway refund via Razorpay VM"
+                          >
+                            {actingOn === o.id ? "Refunding…" : "Gateway Refund"}
+                          </button>
+                        )}
+
+                        {/* Delete order */}
+                        <button
+                          onClick={() => handleDeleteOrder(o.id)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                          title="Permanently delete order"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Pagination Footer */}
+      {totalPages > 1 && (
+        <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-600">
+          <div>
+            Showing {(safePage - 1) * pageSize + 1} to{" "}
+            {Math.min(safePage * pageSize, filteredOrders.length)} of {filteredOrders.length} orders
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg font-medium hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1"
+            >
+              <ChevronLeft size={14} />
+              <span>Previous</span>
+            </button>
+            <span className="font-semibold text-timber-darkwood px-2">
+              Page {safePage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg font-medium hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1"
+            >
+              <span>Next</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 1: Edit Order Details & Shiprocket Tracking */}
+      {editingOrder && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-gray-100 my-8">
+            <div className="flex justify-between items-center pb-4 border-b border-gray-100 mb-6">
+              <div>
+                <h3 className="font-serif text-xl font-bold text-timber-darkwood">Edit Order Details</h3>
+                <p className="text-xs font-mono text-gray-500 mt-0.5">{editingOrder.id}</p>
+              </div>
+              <button
+                onClick={() => setEditingOrder(null)}
+                className="p-2 text-gray-400 hover:text-gray-700 rounded-lg transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-6">
+              {/* Status & Amount */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                    Order Status
+                  </label>
+                  <select
+                    value={editingOrder.status}
+                    onChange={(e) => setEditingOrder({ ...editingOrder, status: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-timber-darkwood focus:ring-2 focus:ring-timber-teal/20 focus:border-timber-teal"
+                  >
+                    {AVAILABLE_ORDER_STATUSES.map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                    Amount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={paiseToRupees(editingOrder.amountPaise)}
+                    onChange={(e) =>
+                      setEditingOrder({
+                        ...editingOrder,
+                        amountPaise: rupeesToPaise(Number(e.target.value) || 0),
+                      })
+                    }
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-timber-darkwood focus:ring-2 focus:ring-timber-teal/20 focus:border-timber-teal"
+                  />
+                </div>
+              </div>
+
+              {/* Shiprocket Tracking Card */}
+              <div className="p-4 bg-timber-beige/30 rounded-xl border border-timber-teal/20 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Truck size={16} className="text-timber-teal" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-timber-teal">
+                      Shiprocket Courier &amp; Live Tracking
+                    </span>
+                  </div>
+                  {editingOrder.shiprocket?.awb && (
+                    <a
+                      href={
+                        editingOrder.shiprocket.trackingUrl ||
+                        `https://shiprocket.co/tracking/${encodeURIComponent(editingOrder.shiprocket.awb.trim())}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-timber-teal hover:underline flex items-center gap-1 font-semibold"
+                    >
+                      <span>Preview Tracking Link</span>
+                      <ExternalLink size={12} />
+                    </a>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Courier Partner</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Blue Dart, Delhivery, DTDC, FedEx"
+                      value={editingOrder.shiprocket?.courierName || editingOrder.shiprocket?.courier || ""}
+                      onChange={(e) =>
+                        setEditingOrder({
+                          ...editingOrder,
+                          shiprocket: {
+                            ...editingOrder.shiprocket,
+                            courierName: e.target.value,
+                            courier: e.target.value,
+                          },
+                        })
+                      }
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">AWB Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 141123456789"
+                      value={editingOrder.shiprocket?.awb || ""}
+                      onChange={(e) => {
+                        const awbVal = e.target.value;
+                        setEditingOrder({
+                          ...editingOrder,
+                          shiprocket: {
+                            ...editingOrder.shiprocket,
+                            awb: awbVal,
+                            trackingUrl: awbVal ? `https://shiprocket.co/tracking/${encodeURIComponent(awbVal.trim())}` : "",
+                          },
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-mono text-gray-800"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Custom Tracking URL (Optional)</label>
+                  <input
+                    type="url"
+                    placeholder="https://shiprocket.co/tracking/..."
+                    value={editingOrder.shiprocket?.trackingUrl || ""}
+                    onChange={(e) =>
+                      setEditingOrder({
+                        ...editingOrder,
+                        shiprocket: {
+                          ...editingOrder.shiprocket,
+                          trackingUrl: e.target.value,
+                        },
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-mono text-gray-800"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Auto-defaults to <code>https://shiprocket.co/tracking/[AWB]</code> when AWB is provided.
+                  </p>
+                </div>
+              </div>
+
+              {/* Customer Info */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">Customer Details</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Name</label>
+                    <input
+                      type="text"
+                      value={editingOrder.customer?.name || ""}
+                      onChange={(e) =>
+                        setEditingOrder({
+                          ...editingOrder,
+                          customer: { ...editingOrder.customer, name: e.target.value },
+                        })
+                      }
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Phone</label>
+                    <input
+                      type="text"
+                      value={editingOrder.customer?.phone || ""}
+                      onChange={(e) =>
+                        setEditingOrder({
+                          ...editingOrder,
+                          customer: { ...editingOrder.customer, phone: e.target.value },
+                        })
+                      }
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={editingOrder.customer?.email || ""}
+                      onChange={(e) =>
+                        setEditingOrder({
+                          ...editingOrder,
+                          customer: { ...editingOrder.customer, email: e.target.value },
+                        })
+                      }
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Delivery Address */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">Shipping Address</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs text-gray-500 mb-1">Address Line 1</label>
+                    <input
+                      type="text"
+                      value={editingOrder.address?.line1 || ""}
+                      onChange={(e) =>
+                        setEditingOrder({
+                          ...editingOrder,
+                          address: { ...editingOrder.address, line1: e.target.value },
+                        })
+                      }
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">City</label>
+                    <input
+                      type="text"
+                      value={editingOrder.address?.city || ""}
+                      onChange={(e) =>
+                        setEditingOrder({
+                          ...editingOrder,
+                          address: { ...editingOrder.address, city: e.target.value },
+                        })
+                      }
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">State</label>
+                    <input
+                      type="text"
+                      value={editingOrder.address?.state || ""}
+                      onChange={(e) =>
+                        setEditingOrder({
+                          ...editingOrder,
+                          address: { ...editingOrder.address, state: e.target.value },
+                        })
+                      }
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Pincode</label>
+                    <input
+                      type="text"
+                      value={editingOrder.address?.pincode || ""}
+                      onChange={(e) =>
+                        setEditingOrder({
+                          ...editingOrder,
+                          address: { ...editingOrder.address, pincode: e.target.value },
+                        })
+                      }
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Admin & Customer Notes */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Order &amp; Workshop Notes
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Seasoning wood batch #4, customer requested dispatch after 10th, or refund explanation..."
+                  value={editingOrder.adminNotes || ""}
+                  onChange={(e) => setEditingOrder({ ...editingOrder, adminNotes: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-timber-teal/20 focus:border-timber-teal"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end items-center gap-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingOrder(null)}
+                  className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl text-xs font-semibold uppercase tracking-wider hover:bg-gray-50 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-6 py-2.5 bg-timber-teal text-white rounded-xl text-xs font-semibold uppercase tracking-wider hover:bg-timber-darkwood transition flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  <Save size={14} />
+                  <span>{savingEdit ? "Saving Changes…" : "Save Changes"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: Create Manual Order */}
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-gray-100 my-8">
+            <div className="flex justify-between items-center pb-4 border-b border-gray-100 mb-6">
+              <div>
+                <h3 className="font-serif text-xl font-bold text-timber-darkwood">Create Manual Order</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Record an offline, showroom, phone, or custom furniture order.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsCreateOpen(false)}
+                className="p-2 text-gray-400 hover:text-gray-700 rounded-lg transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateOrder} className="space-y-6">
+              {/* Order ID & Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                    Order ID (Leave blank to auto-generate)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. ord_custom_1024"
+                    value={newOrder.id}
+                    onChange={(e) => setNewOrder({ ...newOrder, id: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono text-gray-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                    Initial Status
+                  </label>
+                  <select
+                    value={newOrder.status}
+                    onChange={(e) => setNewOrder({ ...newOrder, status: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-timber-darkwood"
+                  >
+                    {AVAILABLE_ORDER_STATUSES.map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Customer Info */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">Customer Details</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Customer Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Rajesh Kumar"
+                      value={newOrder.customerName}
+                      onChange={(e) => setNewOrder({ ...newOrder, customerName: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Phone Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 9876543210"
+                      value={newOrder.customerPhone}
+                      onChange={(e) => setNewOrder({ ...newOrder, customerPhone: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      placeholder="customer@example.com"
+                      value={newOrder.customerEmail}
+                      onChange={(e) => setNewOrder({ ...newOrder, customerEmail: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Shipping Address */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">Shipping Address</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs text-gray-500 mb-1">Address Line 1</label>
+                    <input
+                      type="text"
+                      placeholder="House / Street / Apartment"
+                      value={newOrder.addressLine1}
+                      onChange={(e) => setNewOrder({ ...newOrder, addressLine1: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">City</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Chennai"
+                      value={newOrder.city}
+                      onChange={(e) => setNewOrder({ ...newOrder, city: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">State</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Tamil Nadu"
+                      value={newOrder.state}
+                      onChange={(e) => setNewOrder({ ...newOrder, state: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Pincode</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 600001"
+                      value={newOrder.pincode}
+                      onChange={(e) => setNewOrder({ ...newOrder, pincode: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Items in Order */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">Ordered Items</h4>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setNewOrder({
+                        ...newOrder,
+                        items: [...newOrder.items, { name: "", qty: 1, priceRupees: 0 }],
+                      })
+                    }
+                    className="text-xs text-timber-teal hover:underline font-semibold flex items-center gap-1"
+                  >
+                    <Plus size={12} />
+                    <span>Add Item</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {newOrder.items.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                      <input
+                        type="text"
+                        placeholder="Item name / Furniture model"
+                        value={item.name}
+                        onChange={(e) => {
+                          const updated = [...newOrder.items];
+                          updated[idx].name = e.target.value;
+                          setNewOrder({ ...newOrder, items: updated });
+                        }}
+                        className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm"
+                      />
+                      <div className="w-20">
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="Qty"
+                          value={item.qty}
+                          onChange={(e) => {
+                            const updated = [...newOrder.items];
+                            updated[idx].qty = Math.max(1, parseInt(e.target.value) || 1);
+                            setNewOrder({ ...newOrder, items: updated });
+                          }}
+                          className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-center"
+                        />
+                      </div>
+                      <div className="w-28">
+                        <input
+                          type="number"
+                          placeholder="Price (₹)"
+                          value={item.priceRupees || ""}
+                          onChange={(e) => {
+                            const updated = [...newOrder.items];
+                            updated[idx].priceRupees = Number(e.target.value) || 0;
+                            setNewOrder({ ...newOrder, items: updated });
+                          }}
+                          className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-right"
+                        />
+                      </div>
+                      {newOrder.items.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewOrder({
+                              ...newOrder,
+                              items: newOrder.items.filter((_, i) => i !== idx),
+                            });
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-red-600 rounded-md"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="text-right text-sm font-semibold text-timber-darkwood pt-1">
+                  Total Order Amount: ₹
+                  {newOrder.items
+                    .reduce((sum, it) => sum + (Number(it.priceRupees) || 0) * (Number(it.qty) || 1), 0)
+                    .toLocaleString("en-IN")}
+                </div>
+              </div>
+
+              {/* Optional Shiprocket Courier & AWB */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Courier Partner (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Blue Dart, Delhivery"
+                    value={newOrder.courier}
+                    onChange={(e) => setNewOrder({ ...newOrder, courier: e.target.value })}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    AWB Tracking Number (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 141123456789"
+                    value={newOrder.awb}
+                    onChange={(e) => setNewOrder({ ...newOrder, awb: e.target.value })}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Order &amp; Workshop Notes
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Custom teak stain, offline advance paid via cash, delivery expected by 15th..."
+                  value={newOrder.adminNotes}
+                  onChange={(e) => setNewOrder({ ...newOrder, adminNotes: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+                />
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex justify-end items-center gap-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(false)}
+                  className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl text-xs font-semibold uppercase tracking-wider hover:bg-gray-50 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingOrder}
+                  className="px-6 py-2.5 bg-timber-darkwood text-timber-beige rounded-xl text-xs font-semibold uppercase tracking-wider hover:bg-timber-teal transition flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  <Plus size={14} />
+                  <span>{creatingOrder ? "Creating Order…" : "Create Order"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

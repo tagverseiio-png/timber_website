@@ -30,8 +30,21 @@ export interface CustomerOrder {
   receipt?: string;
   amountPaise: number;
   currency: string;
-  status: "pending" | "paid" | "processing" | "shipped" | "out_for_delivery" | "delivered" | "failed" | "refunded";
+  status:
+    | "pending"
+    | "paid"
+    | "processing"
+    | "shipped"
+    | "out_for_delivery"
+    | "delivered"
+    | "failed"
+    | "refunded"
+    | "cancelled"
+    | "out_of_stock"
+    | string;
   createdAt: number;
+  updatedAt?: number;
+  adminNotes?: string;
   customer?: {
     name: string;
     email: string;
@@ -45,18 +58,21 @@ export interface CustomerOrder {
     pincode: string;
   };
   items?: Array<{
-    id: string;
+    id?: string;
     name: string;
     qty: number;
     pricePaise: number;
   }>;
   shiprocket?: {
-    orderId?: number;
-    shipmentId?: number;
+    orderId?: number | string;
+    shipmentId?: number | string;
     awb?: string;
     courier?: string;
+    courierName?: string;
     trackingUrl?: string;
+    tracking_url?: string;
     status?: string;
+    state?: string;
   };
 }
 

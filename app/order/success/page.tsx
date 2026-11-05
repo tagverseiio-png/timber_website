@@ -35,6 +35,8 @@ const STATUS_TEXT: Record<string, { label: string; cls: string }> = {
   delivered: { label: "Delivered", cls: "bg-emerald-100 text-emerald-800" },
   failed: { label: "Payment failed", cls: "bg-red-100 text-red-700" },
   refunded: { label: "Refunded", cls: "bg-yellow-100 text-yellow-800" },
+  cancelled: { label: "Cancelled", cls: "bg-rose-100 text-rose-800" },
+  out_of_stock: { label: "Out of Stock / In Workshop", cls: "bg-amber-100 text-amber-800" },
   rto: { label: "Return in progress", cls: "bg-orange-100 text-orange-800" },
 };
 
