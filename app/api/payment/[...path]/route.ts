@@ -30,7 +30,18 @@ export async function POST(
       body: bodyText,
     });
 
-    const data = await response.json().catch(() => ({}));
+    const text = await response.text();
+    let data: Record<string, unknown> = {};
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = {
+        error:
+          response.status === 502
+            ? "Payment backend is restarting or temporarily busy. Please retry in a few seconds."
+            : `Backend returned error code ${response.status}`,
+      };
+    }
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
     console.error("[api/payment proxy error]:", error);
@@ -71,3 +82,4 @@ export async function GET(
     );
   }
 }
+

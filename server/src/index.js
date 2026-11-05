@@ -79,12 +79,12 @@ app.post("/shipping/quote", paymentLimiter, shippingQuote);
 app.post("/fulfill", paymentLimiter, fulfill);
 app.post("/refund", paymentLimiter, refundOrder);
 
-// JSON error envelope (never leaks stack traces or secrets).
+// JSON error envelope (returns clear error message without leaking secrets).
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err, _req, res, _next) => {
   const status = err.status ?? 500;
-  if (status >= 500) console.error(err);
-  res.status(status).json({ error: status >= 500 ? "Internal error." : err.message });
+  if (status >= 500) console.error("[payment-server error]:", err);
+  res.status(status).json({ error: err.message || "Internal error." });
 });
 
 app.listen(config.port, () => {

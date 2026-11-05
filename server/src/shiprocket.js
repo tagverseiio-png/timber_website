@@ -84,8 +84,12 @@ async function srRequest(path, body, { retryOn401 = true, method = "POST" } = {}
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    console.error(`[shiprocket] ${path} ${res.status}:`, JSON.stringify(data).slice(0, 500));
-    throw new HttpError(502, `Shiprocket request failed (${res.status}).`);
+    const errorDetail =
+      data.message ||
+      (typeof data.errors === "object" ? JSON.stringify(data.errors) : "") ||
+      JSON.stringify(data);
+    console.error(`[shiprocket] ${path} ${res.status}:`, errorDetail.slice(0, 500));
+    throw new HttpError(res.status, `Shiprocket error (${res.status}): ${errorDetail}`);
   }
   return data;
 }
@@ -126,13 +130,15 @@ function parcelSpec(items) {
   };
 }
 
-/** dd/mm/yyyy — the format Shiprocket's create-order API accepts. */
+/** YYYY-MM-DD HH:mm — the format Shiprocket's create-order API accepts. */
 function shiprocketDate(ms) {
   const d = new Date(ms);
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
   const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
 }
 
 /**
@@ -203,58 +209,77 @@ export async function fulfill(req, res, next) {
     const sr = parcelSpec(order.items ?? []);
     const c = config.shiprocket;
 
+    const fullName = (order.customer?.name ?? "Customer").trim();
+    const nameParts = fullName.split(/\s+/);
+    const firstName = nameParts[0] || "Customer";
+    const lastName = nameParts.slice(1).join(" ") || firstName;
+
+    // Shiprocket expects weight in KILOGRAMS (e.g. 500g -> 0.5kg)
+    const weightKg = Math.max(0.05, Number(((sr.weight ?? 500) / 1000).toFixed(2)));
+
     const payload = {
-      order_number: orderId, // match on Razorpay order id — unique, end-to-end traceable
+      order_id: orderId,
       order_date: shiprocketDate(order.createdAt ?? Date.now()),
       ...(c.pickupLocation ? { pickup_location: c.pickupLocation } : {}),
-      billing_customer_name: order.customer?.name ?? "",
-      billing_firstname: (order.customer?.name ?? "").split(" ")[0],
-      billing_lastname: (order.customer?.name ?? "").split(" ").slice(1).join(" "),
+      billing_customer_name: firstName,
+      billing_last_name: lastName,
       billing_address: order.address?.line1 ?? "",
       billing_address_2: order.address?.line2 ?? "",
       billing_city: order.address?.city ?? "",
       billing_pincode: order.address?.pincode ?? "",
       billing_state: order.address?.state ?? "",
       billing_country: "India",
-      billing_phone: order.customer?.phone ?? "",
-      billing_email: order.customer?.email ?? "",
+      billing_phone: (order.customer?.phone ?? "").replace(/\D/g, "").slice(-10) || "9876543210",
+      billing_email: order.customer?.email ?? "support@timberteak.com",
       shipping_is_billing: true,
       order_items: (order.items ?? []).map((item) => ({
         name: item.name,
-        sku: item.id,
-        units: Number(item.qty),
-        selling_price: Number(item.pricePaise) / 100,
+        sku: item.id || item.name.slice(0, 30),
+        units: Number(item.qty) || 1,
+        selling_price: (Number(item.pricePaise) || 0) / 100,
       })),
       payment_method: "Prepaid", // Razorpay = always prepaid
       sub_total: Number(order.amountPaise) / 100,
-      weight: sr.weight,
-      ...(sr.length ? { length: sr.length, width: sr.width, height: sr.height } : {}),
+      weight: weightKg,
+      length: Math.max(1, sr.length || 10),
+      breadth: Math.max(1, sr.width || 10),
+      height: Math.max(1, sr.height || 10),
     };
 
-    const created = await srRequest("/orders", payload);
-    // Shiprocket v1 create-order → { order_id, shipment_id }
+    const created = await srRequest("/orders/create/adhoc", payload);
     const shipmentId =
-      (Array.isArray(created.insert_data) ? created.insert_data[0]?.shipment_id : undefined) ??
       created.shipment_id ??
+      (Array.isArray(created.insert_data) ? created.insert_data[0]?.shipment_id : undefined) ??
       "";
     const shiprocketInfo = {
       orderId: String(created.order_id ?? ""),
       shipmentId: String(shipmentId ?? ""),
-      awb: "", // filled by assign-awb below (or the webhook later)
-      courierName: "",
-      state: "created", // created | picked_up | in_transit | out_for_delivery | delivered | undelivered | rto
+      awb: String(created.awb_code ?? ""),
+      courierName: String(created.courier_name ?? ""),
+      state: "created",
       createdAt: Date.now(),
       by: adminUid,
     };
 
-    // Assign AWB when we have a shipment id — non-fatal, the webhook fills it in later.
-    if (shiprocketInfo.shipmentId) {
+    // Assign AWB when we have a shipment id and AWB was not auto-assigned
+    if (shiprocketInfo.shipmentId && !shiprocketInfo.awb) {
       try {
-        const awb = await srRequest("/orders/assign/awb", { shipment_id: shiprocketInfo.shipmentId });
-        shiprocketInfo.awb = String(awb.data?.awb_number ?? awb.awb_number ?? "");
-        shiprocketInfo.courierName = String(awb.data?.courier_name ?? awb.courier_name ?? "");
+        const awb = await srRequest("/courier/assign/awb", { shipment_id: shiprocketInfo.shipmentId });
+        shiprocketInfo.awb = String(
+          awb.response?.data?.awb_code ??
+            awb.data?.awb_number ??
+            awb.awb_code ??
+            awb.awb_number ??
+            ""
+        );
+        shiprocketInfo.courierName = String(
+          awb.response?.data?.courier_name ??
+            awb.data?.courier_name ??
+            awb.courier_name ??
+            ""
+        );
       } catch (err) {
-        console.warn("[shiprocket] assign-awb deferred to webhook:", err.message);
+        console.warn("[shiprocket] courier/assign/awb deferred:", err.message);
       }
     }
 
