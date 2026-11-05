@@ -39,8 +39,24 @@ import {
 } from "@/lib/products/types";
 import { formatPrice, rupeesToPaise, paiseToRupees } from "@/lib/money";
 import Image from "next/image";
+import Link from "next/link";
 import { ALL_PRODUCTS } from "@/app/projects/reference/shop_data_backup";
 import { BOUTIQUE_PRODUCTS } from "@/lib/products/boutique_seed";
+import {
+  ShoppingBag,
+  Package,
+  MessageSquare,
+  Settings,
+  ExternalLink,
+  LogOut,
+  ShieldCheck,
+  Plus,
+  Search,
+  AlertTriangle,
+  RotateCcw,
+  UploadCloud,
+  Trash2,
+} from "lucide-react";
 
 const ADMIN_PAGE_SIZE = 12;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -407,7 +423,15 @@ function statusLabel(s: string): string {
   return s.replace(/_/g, " ").toUpperCase();
 }
 
-function OrdersSection({ notify, user }: { notify: (kind: "success" | "error", msg: string) => void; user: User | null }) {
+function OrdersSection({
+  notify,
+  user,
+  onCountsChange,
+}: {
+  notify: (kind: "success" | "error", msg: string) => void;
+  user: User | null;
+  onCountsChange?: (total: number, paid: number) => void;
+}) {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [listError, setListError] = useState<string | null>(null);
   const [actingOn, setActingOn] = useState<string | null>(null);
@@ -428,11 +452,12 @@ function OrdersSection({ notify, user }: { notify: (kind: "success" | "error", m
           .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
         setOrders(rows);
         setListError(null);
+        onCountsChange?.(rows.length, rows.filter((r) => r.status === "paid").length);
       },
       (err) => setListError(err.message)
     );
     return () => unsub();
-  }, [user]);
+  }, [user, onCountsChange]);
 
   /** Semi-auto: admin reviews a paid order → confirms → VM creates the shipment. */
   const approveAndShip = async (o: OrderRow) => {
@@ -627,7 +652,15 @@ interface InquiryRow {
   createdAt?: number;
 }
 
-function InquiriesSection({ notify, user }: { notify: (kind: "success" | "error", msg: string) => void; user: User | null }) {
+function InquiriesSection({
+  notify,
+  user,
+  onCountsChange,
+}: {
+  notify: (kind: "success" | "error", msg: string) => void;
+  user: User | null;
+  onCountsChange?: (total: number, newCount: number) => void;
+}) {
   const [inquiries, setInquiries] = useState<InquiryRow[]>([]);
   const [listError, setListError] = useState<string | null>(null);
   const [actingOn, setActingOn] = useState<string | null>(null);
@@ -648,11 +681,12 @@ function InquiriesSection({ notify, user }: { notify: (kind: "success" | "error"
           .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
         setInquiries(rows);
         setListError(null);
+        onCountsChange?.(rows.length, rows.filter((r) => r.status === "new").length);
       },
       (err) => setListError(err.message)
     );
     return () => unsub();
-  }, [user]);
+  }, [user, onCountsChange]);
 
   const toggleStatus = async (inq: InquiryRow) => {
     setActingOn(inq.id);
@@ -789,6 +823,10 @@ export default function AdminPanel() {
   const [query, setQuery] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [page, setPage] = useState(1);
+
+  const [activeTab, setActiveTab] = useState<"orders" | "products" | "inquiries" | "maintenance">("orders");
+  const [ordersStats, setOrdersStats] = useState({ total: 0, paid: 0 });
+  const [inquiriesStats, setInquiriesStats] = useState({ total: 0, newCount: 0 });
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<CatalogProduct | null>(null);
@@ -1132,232 +1170,464 @@ export default function AdminPanel() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-lg shadow-sm">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Executive Header Bar */}
+        <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="font-serif text-3xl text-timber-darkwood">Product Management</h1>
-            <p className="text-gray-500 text-sm mt-1">Firebase Realtime Database · admin-only writes · images as base64 · prices in paise</p>
+            <div className="flex items-center gap-3">
+              <h1 className="font-serif text-2xl md:text-3xl text-timber-darkwood font-bold">
+                TIMBER.
+              </h1>
+              <span className="text-[11px] uppercase tracking-widest font-semibold px-2.5 py-1 bg-timber-teal/10 text-timber-teal rounded-full">
+                Admin Console
+              </span>
+            </div>
+            <p className="text-gray-500 text-xs mt-1">
+              Store operations, customer orders, live Shiprocket tracking &amp; catalog management
+            </p>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-medium text-gray-700">{user.email}</span>
+
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+            <Link
+              href="/"
+              target="_blank"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition"
+            >
+              <span>View Storefront</span>
+              <ExternalLink size={13} />
+            </Link>
+
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200/60 rounded-xl text-xs text-emerald-800">
+              <ShieldCheck size={14} className="text-emerald-600" />
+              <span className="font-medium max-w-[170px] truncate">{user.email}</span>
+            </div>
+
             <button
               onClick={() => signOut(auth)}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition text-sm font-medium"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition"
             >
-              Logout
+              <LogOut size={13} />
+              <span>Sign Out</span>
             </button>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm mb-8 border-l-4 border-timber-darkwood">
-          <h2 className="text-xl font-serif text-timber-darkwood mb-2">Database Management</h2>
-          <p className="text-gray-600 mb-4 text-sm max-w-2xl">
-            Manage product records under <code>/projects</code> in Firebase Realtime Database.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={uploadBoutiqueProducts}
-              disabled={!!uploadProgress}
-              className="px-6 py-2.5 bg-timber-teal text-white rounded-md hover:bg-timber-darkwood transition font-medium text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {uploadProgress ? `Converting ${uploadProgress.current}/${uploadProgress.total}…` : "Upload 16 Products (base64)"}
-            </button>
-            <button
-              onClick={clearAllProducts}
-              disabled={!!uploadProgress}
-              className="px-6 py-2.5 bg-red-700 text-white rounded-md hover:bg-red-800 transition font-medium text-sm disabled:opacity-50"
-            >
-              Delete All Products from Firebase
-            </button>
-            <button
-              onClick={pushSeeds}
-              disabled={!!uploadProgress}
-              className="px-6 py-2.5 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 transition font-medium text-sm disabled:opacity-50"
-            >
-              Restore All Products from Backup
-            </button>
-          </div>
-          {uploadProgress && (
-            <div className="mt-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div
-                    className="bg-timber-teal h-2.5 rounded-full transition-all duration-300"
-                    style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+        {/* Executive KPI Overview Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <button
+            onClick={() => setActiveTab("orders")}
+            className={`p-5 rounded-2xl bg-white border text-left transition-all hover:shadow-md cursor-pointer ${
+              activeTab === "orders" ? "border-timber-teal ring-2 ring-timber-teal/20" : "border-gray-100 shadow-xs"
+            }`}
+          >
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Orders &amp; Shipments</span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-100/70 text-emerald-800 flex items-center justify-center">
+                <ShoppingBag size={16} />
+              </div>
+            </div>
+            <div className="text-2xl font-serif font-bold text-timber-darkwood">{ordersStats.total}</div>
+            <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+              {ordersStats.paid > 0 ? (
+                <span className="text-amber-700 font-semibold">{ordersStats.paid} pending shipment</span>
+              ) : (
+                <span>All orders processed</span>
+              )}
+            </p>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("products")}
+            className={`p-5 rounded-2xl bg-white border text-left transition-all hover:shadow-md cursor-pointer ${
+              activeTab === "products" ? "border-timber-teal ring-2 ring-timber-teal/20" : "border-gray-100 shadow-xs"
+            }`}
+          >
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Catalog Products</span>
+              <div className="w-8 h-8 rounded-xl bg-amber-100/70 text-amber-800 flex items-center justify-center">
+                <Package size={16} />
+              </div>
+            </div>
+            <div className="text-2xl font-serif font-bold text-timber-darkwood">{products.length}</div>
+            <p className="text-xs text-gray-500 mt-1">
+              {products.filter((p) => p.isActive).length} live on storefront
+            </p>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("inquiries")}
+            className={`p-5 rounded-2xl bg-white border text-left transition-all hover:shadow-md cursor-pointer ${
+              activeTab === "inquiries" ? "border-timber-teal ring-2 ring-timber-teal/20" : "border-gray-100 shadow-xs"
+            }`}
+          >
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Customer Messages</span>
+              <div className="w-8 h-8 rounded-xl bg-blue-100/70 text-blue-800 flex items-center justify-center">
+                <MessageSquare size={16} />
+              </div>
+            </div>
+            <div className="text-2xl font-serif font-bold text-timber-darkwood">{inquiriesStats.total}</div>
+            <p className="text-xs text-gray-500 mt-1">
+              {inquiriesStats.newCount > 0 ? (
+                <span className="text-emerald-700 font-semibold">{inquiriesStats.newCount} new messages</span>
+              ) : (
+                <span>All inquiries handled</span>
+              )}
+            </p>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("maintenance")}
+            className={`p-5 rounded-2xl bg-white border text-left transition-all hover:shadow-md cursor-pointer ${
+              activeTab === "maintenance" ? "border-timber-teal ring-2 ring-timber-teal/20" : "border-gray-100 shadow-xs"
+            }`}
+          >
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">System &amp; Database</span>
+              <div className="w-8 h-8 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center">
+                <Settings size={16} />
+              </div>
+            </div>
+            <div className="text-2xl font-serif font-bold text-timber-darkwood">Live</div>
+            <p className="text-xs text-emerald-700 font-medium mt-1 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+              <span>RTDB &amp; Storage Connected</span>
+            </p>
+          </button>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex border-b border-timber-darkwood/10 space-x-1 sm:space-x-3 overflow-x-auto pb-px">
+          <button
+            onClick={() => setActiveTab("orders")}
+            className={`pb-3.5 px-4 font-serif text-sm sm:text-base flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "orders"
+                ? "border-timber-teal text-timber-teal font-bold"
+                : "border-transparent text-gray-500 hover:text-timber-darkwood"
+            }`}
+          >
+            <ShoppingBag size={16} />
+            <span>Orders &amp; Shipments</span>
+            {ordersStats.total > 0 && (
+              <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-sans font-bold bg-timber-teal/10 text-timber-teal">
+                {ordersStats.total}
+              </span>
+            )}
+            {ordersStats.paid > 0 && (
+              <span className="w-2 h-2 rounded-full bg-amber-500" title="Orders pending approval" />
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab("products")}
+            className={`pb-3.5 px-4 font-serif text-sm sm:text-base flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "products"
+                ? "border-timber-teal text-timber-teal font-bold"
+                : "border-transparent text-gray-500 hover:text-timber-darkwood"
+            }`}
+          >
+            <Package size={16} />
+            <span>Product Catalog</span>
+            <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-sans font-bold bg-gray-100 text-gray-700">
+              {products.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("inquiries")}
+            className={`pb-3.5 px-4 font-serif text-sm sm:text-base flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "inquiries"
+                ? "border-timber-teal text-timber-teal font-bold"
+                : "border-transparent text-gray-500 hover:text-timber-darkwood"
+            }`}
+          >
+            <MessageSquare size={16} />
+            <span>Customer Inquiries</span>
+            {inquiriesStats.newCount > 0 && (
+              <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-sans font-bold bg-emerald-100 text-emerald-800">
+                {inquiriesStats.newCount} new
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab("maintenance")}
+            className={`pb-3.5 px-4 font-serif text-sm sm:text-base flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "maintenance"
+                ? "border-timber-teal text-timber-teal font-bold"
+                : "border-transparent text-gray-500 hover:text-timber-darkwood"
+            }`}
+          >
+            <Settings size={16} />
+            <span>System &amp; Maintenance</span>
+          </button>
+        </div>
+
+        {/* TAB 1: Orders & Fulfillment */}
+        {activeTab === "orders" && (
+          <OrdersSection
+            notify={notify}
+            user={user}
+            onCountsChange={(total, paid) => setOrdersStats({ total, paid })}
+          />
+        )}
+
+        {/* TAB 2: Product Catalog */}
+        {activeTab === "products" && (
+          <div className="space-y-6">
+            <div className="bg-white p-4 rounded-2xl shadow-xs border border-gray-100 flex flex-col md:flex-row gap-3 md:items-center justify-between">
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+                  placeholder="Search products by title, description or category…"
+                  aria-label="Search products"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-timber-teal/30 focus:border-timber-teal"
+                />
+              </div>
+
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-xs font-medium text-gray-600 whitespace-nowrap cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showInactive}
+                    onChange={(e) => { setShowInactive(e.target.checked); setPage(1); }}
+                    className="w-4 h-4 rounded text-timber-teal focus:ring-timber-teal"
                   />
-                </div>
-                <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
-                  {uploadProgress.current}/{uploadProgress.total}
+                  <span>Show hidden products</span>
+                </label>
+
+                <button
+                  onClick={() => { setEditing(null); setModalOpen(true); }}
+                  className="px-4 py-2.5 bg-timber-teal text-white rounded-xl hover:bg-timber-darkwood transition text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+                >
+                  <Plus size={15} />
+                  <span>Add Product</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {allCategories.map((category) => (
+                <button
+                  key={category}
+                  onClick={() => { setSelectedCategory(category); setPage(1); }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                    selectedCategory === category
+                      ? "bg-timber-teal text-white shadow-xs font-semibold"
+                      : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-xs border border-gray-100 overflow-hidden">
+              <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+                <h2 className="text-lg font-serif font-bold text-timber-darkwood">
+                  Products ({filtered.length}{filtered.length !== products.length ? ` of ${products.length}` : ""})
+                </h2>
+                <span className="text-xs text-gray-500">
+                  Showing page {safePage} of {totalPages}
                 </span>
               </div>
-              <p className="text-xs text-gray-500">
-                Uploading: <strong>{uploadProgress.name}</strong>
+
+              {listError ? (
+                <div className="p-12 text-center">
+                  <p className="text-red-600 font-medium mb-2">Couldn&apos;t load products</p>
+                  <p className="text-gray-500 text-sm">{listError}</p>
+                  <p className="text-gray-500 text-xs mt-2">If this persists after deploying database.rules.json, check the rules allow admin reads.</p>
+                </div>
+              ) : paged.length === 0 ? (
+                <div className="p-12 text-center text-gray-500 italic">
+                  {products.length === 0 ? "No products yet — add your first one." : "No products match this filter."}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-gray-50/80">
+                      <tr>
+                        <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Image</th>
+                        <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Details</th>
+                        <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Category</th>
+                        <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Price</th>
+                        <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Stock</th>
+                        <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Status</th>
+                        <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {paged.map((project) => (
+                        <tr key={project.id} className={`hover:bg-gray-50/50 transition ${!project.isActive ? "opacity-60" : ""}`}>
+                          <td className="py-4 px-6">
+                            <div className="relative w-16 h-16 bg-gray-100 rounded-xl overflow-hidden border border-gray-200">
+                              {project.images[0] && (
+                                <Image
+                                  src={project.images[0]}
+                                  alt={project.name}
+                                  fill
+                                  className="object-cover"
+                                  unoptimized={project.images[0].startsWith("data:")}
+                                />
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-4 px-6">
+                            <div className="font-semibold text-gray-900 text-sm">{project.name}</div>
+                            <div className="text-xs text-gray-500 mt-1 max-w-xs line-clamp-2">{project.description}</div>
+                          </td>
+                          <td className="py-4 px-6">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 uppercase tracking-wider">
+                              {project.category}
+                            </span>
+                          </td>
+                          <td className="py-4 px-6 font-semibold text-gray-900 text-sm">
+                            {formatPrice(project.pricePaise, project.currency)}
+                          </td>
+                          <td className="py-4 px-6 text-sm text-gray-700">
+                            {project.stock == null ? <span className="text-gray-400">—</span> : project.stock}
+                          </td>
+                          <td className="py-4 px-6">
+                            {!project.isActive ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Hidden</span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Live</span>
+                            )}
+                          </td>
+                          <td className="py-4 px-6 text-right whitespace-nowrap text-sm font-medium">
+                            <button
+                              onClick={() => { setEditing(project); setModalOpen(true); }}
+                              className="text-timber-teal hover:underline mr-4 cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                            {!project.isActive ? (
+                              <button onClick={() => restore(project)} className="text-green-700 hover:underline mr-4 cursor-pointer">
+                                Restore
+                              </button>
+                            ) : (
+                              <button onClick={() => softDelete(project)} className="text-amber-700 hover:underline mr-4 cursor-pointer">
+                                Hide
+                              </button>
+                            )}
+                            <button onClick={() => hardDelete(project)} className="text-red-600 hover:underline cursor-pointer">
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {totalPages > 1 && (
+                <div className="p-4 border-t border-gray-100 flex items-center justify-center gap-3 text-sm">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={safePage === 1}
+                    className="px-3 py-1 border rounded disabled:opacity-30 cursor-pointer"
+                  >
+                    Prev
+                  </button>
+                  <span aria-live="polite">Page {safePage} of {totalPages}</span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safePage === totalPages}
+                    className="px-3 py-1 border rounded disabled:opacity-30 cursor-pointer"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: Inquiries */}
+        {activeTab === "inquiries" && (
+          <InquiriesSection
+            notify={notify}
+            user={user}
+            onCountsChange={(total, newCount) => setInquiriesStats({ total, newCount })}
+          />
+        )}
+
+        {/* TAB 4: Maintenance & Developer Operations */}
+        {activeTab === "maintenance" && (
+          <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-xs border border-gray-100 space-y-6">
+            <div>
+              <h2 className="text-xl font-serif font-bold text-timber-darkwood mb-2">
+                System &amp; Database Maintenance
+              </h2>
+              <p className="text-gray-600 text-sm max-w-2xl leading-relaxed">
+                These utilities directly interact with the live Firebase Realtime Database under <code>/projects</code>.
+                Use these tools only when seeding initial catalog data or restoring snapshots.
               </p>
             </div>
-          )}
-        </div>
 
-        <OrdersSection notify={notify} user={user} />
-        <InquiriesSection notify={notify} user={user} />
+            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-3">
+              <AlertTriangle size={18} className="text-amber-700 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold">Caution when modifying database seed states:</p>
+                <p>
+                  Bulk upload will add product rows. Deleting all products will remove all catalog items from the customer storefront.
+                </p>
+              </div>
+            </div>
 
-        <div className="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-col md:flex-row gap-3 md:items-center">
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-            placeholder="Search name, description, category…"
-            aria-label="Search products"
-            className="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-timber-darkwood"
-          />
-          <label className="flex items-center gap-2 text-sm text-gray-700 whitespace-nowrap">
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(e) => { setShowInactive(e.target.checked); setPage(1); }}
-              className="w-4 h-4"
-            />
-            Show hidden products
-          </label>
-        </div>
+            <div className="flex flex-wrap gap-4 pt-2">
+              <button
+                onClick={uploadBoutiqueProducts}
+                disabled={!!uploadProgress}
+                className="px-6 py-3 bg-timber-teal text-white rounded-xl hover:bg-timber-darkwood transition font-semibold text-xs uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-xs"
+              >
+                <UploadCloud size={16} />
+                <span>{uploadProgress ? `Converting ${uploadProgress.current}/${uploadProgress.total}…` : "Upload 16 Products (base64)"}</span>
+              </button>
 
-        <div className="mb-6 flex flex-wrap gap-3">
-          {allCategories.map((category) => (
-            <button
-              key={category}
-              onClick={() => { setSelectedCategory(category); setPage(1); }}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                selectedCategory === category
-                  ? "bg-[#1f4a47] text-white border-[#1f4a47]"
-                  : "bg-transparent text-gray-700 border-gray-300 hover:border-gray-400"
-              }`}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
+              <button
+                onClick={pushSeeds}
+                disabled={!!uploadProgress}
+                className="px-6 py-3 bg-gray-100 text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-200 transition font-semibold text-xs uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+              >
+                <RotateCcw size={16} />
+                <span>Restore Products from Backup</span>
+              </button>
 
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-            <h2 className="text-xl font-serif text-timber-darkwood">
-              Live Products ({filtered.length}{filtered.length !== products.length ? ` of ${products.length}` : ""})
-            </h2>
-            <button
-              onClick={() => { setEditing(null); setModalOpen(true); }}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition text-sm font-medium"
-            >
-              + Add New Product
-            </button>
+              <button
+                onClick={clearAllProducts}
+                disabled={!!uploadProgress}
+                className="px-6 py-3 bg-red-700 text-white rounded-xl hover:bg-red-800 transition font-semibold text-xs uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 cursor-pointer shadow-xs"
+              >
+                <Trash2 size={16} />
+                <span>Delete All Products from Firebase</span>
+              </button>
+            </div>
+
+            {uploadProgress && (
+              <div className="mt-4 p-4 rounded-xl bg-gray-50 border border-gray-200">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div
+                      className="bg-timber-teal h-2.5 rounded-full transition-all duration-300"
+                      style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                    {uploadProgress.current}/{uploadProgress.total}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Uploading: <strong>{uploadProgress.name}</strong>
+                </p>
+              </div>
+            )}
           </div>
-
-          {listError ? (
-            <div className="p-12 text-center">
-              <p className="text-red-600 font-medium mb-2">Couldn&apos;t load products</p>
-              <p className="text-gray-500 text-sm">{listError}</p>
-              <p className="text-gray-500 text-xs mt-2">If this persists after deploying database.rules.json, check the rules allow admin reads.</p>
-            </div>
-          ) : paged.length === 0 ? (
-            <div className="p-12 text-center text-gray-500 italic">
-              {products.length === 0 ? "No products yet — add your first one." : "No products match this filter."}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Image</th>
-                    <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Details</th>
-                    <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Category</th>
-                    <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Price</th>
-                    <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Stock</th>
-                    <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider">Status</th>
-                    <th className="py-3 px-6 font-medium text-gray-500 text-xs uppercase tracking-wider text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {paged.map((project) => (
-                    <tr key={project.id} className={`hover:bg-gray-50/50 transition ${!project.isActive ? "opacity-60" : ""}`}>
-                      <td className="py-4 px-6">
-                        <div className="relative w-20 h-20 bg-gray-100 rounded-md overflow-hidden border border-gray-200">
-                          {project.images[0] && (
-                            <Image
-                              src={project.images[0]}
-                              alt={project.name}
-                              fill
-                              className="object-cover"
-                              unoptimized={project.images[0].startsWith("data:")}
-                            />
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="font-medium text-gray-900">{project.name}</div>
-                        <div className="text-xs text-gray-500 mt-1 max-w-xs line-clamp-2">{project.description}</div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 uppercase tracking-wider">
-                          {project.category}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 font-medium text-gray-900">
-                        {formatPrice(project.pricePaise, project.currency)}
-                      </td>
-                      <td className="py-4 px-6 text-sm text-gray-700">
-                        {project.stock == null ? <span className="text-gray-400">—</span> : project.stock}
-                      </td>
-                      <td className="py-4 px-6">
-                        {!project.isActive ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Hidden</span>
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Live</span>
-                        )}
-                      </td>
-                      <td className="py-4 px-6 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => { setEditing(project); setModalOpen(true); }}
-                          className="text-blue-600 hover:text-blue-900 text-sm font-medium mr-4"
-                        >
-                          Edit
-                        </button>
-                        {!project.isActive ? (
-                          <button onClick={() => restore(project)} className="text-green-700 hover:text-green-900 text-sm font-medium mr-4">
-                            Restore
-                          </button>
-                        ) : (
-                          <button onClick={() => softDelete(project)} className="text-yellow-700 hover:text-yellow-900 text-sm font-medium mr-4">
-                            Hide
-                          </button>
-                        )}
-                        <button onClick={() => hardDelete(project)} className="text-red-600 hover:text-red-900 text-sm font-medium">
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {totalPages > 1 && (
-            <div className="p-4 border-t border-gray-100 flex items-center justify-center gap-3 text-sm">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={safePage === 1}
-                className="px-3 py-1 border rounded disabled:opacity-30"
-              >
-                Prev
-              </button>
-              <span aria-live="polite">Page {safePage} of {totalPages}</span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={safePage === totalPages}
-                className="px-3 py-1 border rounded disabled:opacity-30"
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
