@@ -23,14 +23,29 @@ app.use((_, res, next) => {
   next();
 });
 
-// CORS: the Vercel storefront only. Requests without Origin (curl/SSR) pass.
+// CORS: Allow storefronts, admin panel, preview deployments, and localhost.
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://www.timberteak.com",
+  "https://timberteak.com",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+];
+
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin || config.allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(new Error("CORS: origin not allowed."));
+      if (!origin) return cb(null, true);
+      const isAllowed =
+        DEFAULT_ALLOWED_ORIGINS.includes(origin) ||
+        config.allowedOrigins.includes(origin) ||
+        origin.endsWith(".timberteak.com") ||
+        origin.endsWith(".vercel.app");
+      if (isAllowed) return cb(null, true);
+      return cb(null, false);
     },
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "OPTIONS", "HEAD"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
+    credentials: true,
   })
 );
 

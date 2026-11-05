@@ -5,12 +5,12 @@ import type { NextConfig } from "next";
 // Google Maps embed on /contact, and unsplash images via img-src.
 const cspDirectives = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://cdn.razorpay.com https://www.googletagmanager.com https://apis.google.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://cdn.razorpay.com https://www.googletagmanager.com https://apis.google.com https://*.firebasedatabase.app",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://images.unsplash.com https://firebasestorage.googleapis.com https://*.googleusercontent.com https://maps.gstatic.com https://maps.googleapis.com",
   "font-src 'self' data:",
   "connect-src 'self' https://pay.timberteak.com wss://*.firebaseio.com wss://*.firebasedatabase.app https://*.firebaseio.com https://*.firebasedatabase.app https://firebasestorage.googleapis.com https://firebasestorage.cloudfunction.net https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.googleapis.com https://accounts.google.com https://api.razorpay.com https://lumberjack.razorpay.com https://api-web.razorpay.com",
-  "frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.google.com https://accounts.google.com https://*.firebaseapp.com",
+  "frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.google.com https://accounts.google.com https://*.firebaseapp.com https://*.firebasedatabase.app",
   "worker-src 'self' blob:",
   "frame-ancestors 'self'",
   "base-uri 'self'",
