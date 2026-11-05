@@ -860,7 +860,15 @@ export default function AdminPanel() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
-    const cleanEmail = email.trim();
+    let cleanEmail = email.trim();
+    if (!cleanEmail) return;
+
+    // Browser/DNS specifications do not permit underscores (_) in domain names.
+    // Transparently normalize @timber_ts.com / @timber_TS.com -> @timber-ts.com
+    if (cleanEmail.toLowerCase().includes("@timber_ts.com")) {
+      cleanEmail = cleanEmail.replace(/@timber_ts\.com/i, "@timber-ts.com");
+    }
+
     try {
       await signInWithEmailAndPassword(auth, cleanEmail, password);
     } catch (error: unknown) {
@@ -1035,13 +1043,16 @@ export default function AdminPanel() {
         <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
           <h1 className="text-3xl font-serif text-timber-darkwood mb-2 text-center">Admin Portal</h1>
           <p className="text-gray-500 text-sm text-center mb-6">Sign in with an admin account</p>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} noValidate className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <input
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-timber-darkwood"
                 required
               />
