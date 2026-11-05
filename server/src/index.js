@@ -5,7 +5,7 @@ import rateLimit from "express-rate-limit";
 import { config } from "./config.js";
 import { createOrder, verifyPayment } from "./orders.js";
 import { razorpayWebhook } from "./webhooks.js";
-import { fulfill, shippingQuote, shiprocketWebhook } from "./shiprocket.js";
+import { fulfill, shippingQuote, shiprocketWebhook, getShiprocketStatus } from "./shiprocket.js";
 import { refundOrder } from "./refunds.js";
 
 const app = express();
@@ -76,6 +76,7 @@ const paymentLimiter = rateLimit({
 app.post("/create-order", paymentLimiter, createOrder);
 app.post("/verify-payment", paymentLimiter, verifyPayment);
 app.post("/shipping/quote", paymentLimiter, shippingQuote);
+app.get("/shipping/status", getShiprocketStatus);
 app.post("/fulfill", paymentLimiter, fulfill);
 app.post("/refund", paymentLimiter, refundOrder);
 

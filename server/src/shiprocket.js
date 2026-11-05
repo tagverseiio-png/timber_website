@@ -50,8 +50,15 @@ async function refreshShiprocketToken() {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || typeof data.token !== "string" || !data.token) {
-    console.error("[shiprocket] auth failed:", res.status, data);
-    throw new HttpError(502, "Shiprocket authentication failed.");
+    const errorDetail =
+      data.message ||
+      (typeof data.errors === "object" ? JSON.stringify(data.errors) : "") ||
+      "Invalid credentials or Shiprocket service unavailable";
+    console.error("[shiprocket] auth failed:", res.status, errorDetail);
+    throw new HttpError(
+      res.status === 401 ? 401 : 502,
+      `Shiprocket authentication failed (${res.status}): ${errorDetail}`
+    );
   }
   tokenCache = { token: data.token, fetchedAt: Date.now() };
   return data.token;
@@ -182,6 +189,25 @@ export async function quoteCheapestCourier(items, deliveryPostcode) {
   return best;
 }
 
+async function getPickupLocationName() {
+  const c = config.shiprocket;
+  if (c.pickupLocation) return c.pickupLocation;
+
+  try {
+    const pRes = await srRequest("/settings/company/pickup", {}, { method: "GET" });
+    const addrs = pRes?.data?.shipping_address;
+    if (Array.isArray(addrs) && addrs.length > 0) {
+      const primary = addrs.find((a) => a.is_primary_location === 1) || addrs[0];
+      if (primary?.pickup_location) {
+        return primary.pickup_location;
+      }
+    }
+  } catch (err) {
+    console.warn("[shiprocket] failed to resolve dynamic pickup location:", err.message);
+  }
+  return "Primary";
+}
+
 /**
  * POST /fulfill {orderId} — admin action ("Approve & Ship").
  * Creates the Shiprocket order for a PAID order and assigns an AWB.
@@ -217,17 +243,32 @@ export async function fulfill(req, res, next) {
     // Shiprocket expects weight in KILOGRAMS (e.g. 500g -> 0.5kg)
     const weightKg = Math.max(0.05, Number(((sr.weight ?? 500) / 1000).toFixed(2)));
 
+    const pickupLoc = await getPickupLocationName();
+
+    const address1 = (order.address?.line1 ?? "").trim();
+    const address2 = (order.address?.line2 ?? "").trim();
+    const rawAddress = [address1, address2].filter(Boolean).join(", ");
+    const billingAddress = rawAddress.length >= 10 ? rawAddress : `${rawAddress || "Address"}, India`;
+
+    const pincode = String(order.address?.pincode ?? "").replace(/\D/g, "");
+    if (!/^[1-9]\d{5}$/.test(pincode)) {
+      throw new HttpError(
+        400,
+        `Invalid delivery pincode "${order.address?.pincode || ""}". Must be a valid 6-digit Indian PIN code.`
+      );
+    }
+
     const payload = {
       order_id: orderId,
       order_date: shiprocketDate(order.createdAt ?? Date.now()),
-      ...(c.pickupLocation ? { pickup_location: c.pickupLocation } : {}),
+      pickup_location: pickupLoc,
       billing_customer_name: firstName,
       billing_last_name: lastName,
-      billing_address: order.address?.line1 ?? "",
-      billing_address_2: order.address?.line2 ?? "",
-      billing_city: order.address?.city ?? "",
-      billing_pincode: order.address?.pincode ?? "",
-      billing_state: order.address?.state ?? "",
+      billing_address: billingAddress,
+      billing_address_2: address2 || "",
+      billing_city: order.address?.city || "Chennai",
+      billing_pincode: pincode,
+      billing_state: order.address?.state || "Tamil Nadu",
       billing_country: "India",
       billing_phone: (order.customer?.phone ?? "").replace(/\D/g, "").slice(-10) || "9876543210",
       billing_email: order.customer?.email ?? "support@timberteak.com",
@@ -504,6 +545,62 @@ export async function shiprocketWebhook(req, res, next) {
     });
 
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /shipping/status — admin diagnostic tool to inspect Shiprocket connection,
+ * credentials, and configured pickup addresses.
+ */
+export async function getShiprocketStatus(req, res, next) {
+  try {
+    await requireAdmin(req);
+    const c = config.shiprocket;
+    if (!c.email || !c.password) {
+      return res.json({
+        configured: false,
+        authenticated: false,
+        message:
+          "Shiprocket credentials (SHIPROCKET_EMAIL / SHIPROCKET_PASSWORD) are not set in the server environment on the VM.",
+      });
+    }
+
+    try {
+      await shiprocketToken();
+      let pickupLocations = [];
+      let pickupError = null;
+      try {
+        const pRes = await srRequest("/settings/company/pickup", {}, { method: "GET" });
+        pickupLocations = (pRes?.data?.shipping_address ?? []).map((addr) => ({
+          location: addr.pickup_location,
+          address: `${addr.address || ""}, ${addr.city || ""}, ${addr.state || ""} ${addr.pin_code || ""}`,
+          phone: addr.phone,
+          isPrimary: addr.is_primary_location === 1,
+        }));
+      } catch (pErr) {
+        pickupError = pErr.message;
+      }
+
+      return res.json({
+        configured: true,
+        authenticated: true,
+        email: c.email,
+        configuredPickupLocation: c.pickupLocation || null,
+        detectedPickupLocations: pickupLocations,
+        ready: pickupLocations.length > 0,
+        pickupError,
+      });
+    } catch (authErr) {
+      return res.json({
+        configured: true,
+        authenticated: false,
+        email: c.email,
+        error: authErr.message,
+        ready: false,
+      });
+    }
   } catch (err) {
     next(err);
   }

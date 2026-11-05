@@ -474,6 +474,52 @@ function OrdersSection({
   const [editingOrder, setEditingOrder] = useState<OrderRow | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // Shiprocket Diagnostics State
+  interface ShiprocketStatusData {
+    configured: boolean;
+    authenticated?: boolean;
+    email?: string;
+    configuredPickupLocation?: string | null;
+    detectedPickupLocations?: Array<{
+      location: string;
+      address: string;
+      phone: string;
+      isPrimary: boolean;
+    }>;
+    ready?: boolean;
+    error?: string;
+    message?: string;
+    pickupError?: string | null;
+  }
+  const [checkingShiprocket, setCheckingShiprocket] = useState(false);
+  const [shiprocketStatusResult, setShiprocketStatusResult] = useState<ShiprocketStatusData | null>(null);
+  const [showShiprocketModal, setShowShiprocketModal] = useState(false);
+
+  const checkShiprocketConnection = async () => {
+    if (!user) return;
+    setCheckingShiprocket(true);
+    setShowShiprocketModal(true);
+    setShiprocketStatusResult(null);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/payment/shipping/status", {
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+      const data = await res.json();
+      setShiprocketStatusResult(data);
+    } catch (err) {
+      setShiprocketStatusResult({
+        configured: false,
+        authenticated: false,
+        error: err instanceof Error ? err.message : "Network error contacting payment backend",
+      });
+    } finally {
+      setCheckingShiprocket(false);
+    }
+  };
+
   // Create Manual Order Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [creatingOrder, setCreatingOrder] = useState(false);
@@ -793,13 +839,25 @@ function OrdersSection({
           </p>
         </div>
 
-        <button
-          onClick={() => setIsCreateOpen(true)}
-          className="px-5 py-2.5 bg-timber-darkwood text-timber-beige hover:bg-timber-teal rounded-xl text-xs font-semibold uppercase tracking-wider transition flex items-center gap-2 cursor-pointer shadow-xs shrink-0"
-        >
-          <Plus size={15} />
-          <span>+ Create Manual Order</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <button
+            onClick={checkShiprocketConnection}
+            disabled={checkingShiprocket}
+            className="px-4 py-2.5 bg-white border border-gray-200 text-gray-700 hover:border-timber-teal hover:text-timber-teal rounded-xl text-xs font-semibold uppercase tracking-wider transition flex items-center gap-2 cursor-pointer shadow-2xs disabled:opacity-50"
+            title="Inspect Shiprocket credentials, authentication, and pickup warehouse addresses"
+          >
+            <Truck size={15} className="text-timber-teal" />
+            <span>{checkingShiprocket ? "Checking…" : "Shiprocket Status"}</span>
+          </button>
+
+          <button
+            onClick={() => setIsCreateOpen(true)}
+            className="px-5 py-2.5 bg-timber-darkwood text-timber-beige hover:bg-timber-teal rounded-xl text-xs font-semibold uppercase tracking-wider transition flex items-center gap-2 cursor-pointer shadow-xs shrink-0"
+          >
+            <Plus size={15} />
+            <span>+ Create Manual Order</span>
+          </button>
+        </div>
       </div>
 
       {/* Search Bar & Status Filter Pills */}
@@ -1698,6 +1756,146 @@ function OrdersSection({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: Shiprocket Connection Diagnostics */}
+      {showShiprocketModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-gray-100 my-8">
+            <div className="flex justify-between items-center pb-4 border-b border-gray-100 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-timber-teal/10 flex items-center justify-center text-timber-teal">
+                  <Truck size={20} />
+                </div>
+                <div>
+                  <h3 className="font-serif text-xl font-bold text-timber-darkwood">Shiprocket Integration Status</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Automated fulfillment &amp; courier dispatch pipeline</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowShiprocketModal(false)}
+                className="p-2 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {checkingShiprocket ? (
+              <div className="py-12 text-center space-y-3">
+                <div className="w-8 h-8 border-3 border-timber-teal border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-sm text-gray-600 font-medium">Checking Shiprocket credentials &amp; pickup endpoints…</p>
+              </div>
+            ) : shiprocketStatusResult ? (
+              <div className="space-y-5">
+                {/* 1. Account Auth Status */}
+                <div className="p-4 rounded-xl border flex items-start gap-3 bg-gray-50/70">
+                  <div className="mt-0.5 shrink-0">
+                    {shiprocketStatusResult.authenticated ? (
+                      <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">✓</span>
+                    ) : (
+                      <AlertTriangle size={18} className="text-amber-600" />
+                    )}
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900">Shiprocket Account Auth:</span>
+                      {shiprocketStatusResult.authenticated ? (
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-semibold">Active &amp; Connected</span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-800 rounded-md font-semibold">Not Connected</span>
+                      )}
+                    </div>
+                    {shiprocketStatusResult.email && (
+                      <p className="text-gray-600 font-mono">Account Email: {shiprocketStatusResult.email}</p>
+                    )}
+                    {shiprocketStatusResult.error && (
+                      <p className="text-red-700 bg-red-50 p-2 rounded border border-red-200 mt-1">{shiprocketStatusResult.error}</p>
+                    )}
+                    {shiprocketStatusResult.message && (
+                      <p className="text-amber-800 mt-1">{shiprocketStatusResult.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Pickup Warehouse Address */}
+                <div className="p-4 rounded-xl border flex items-start gap-3 bg-gray-50/70">
+                  <div className="mt-0.5 shrink-0">
+                    {shiprocketStatusResult.detectedPickupLocations && shiprocketStatusResult.detectedPickupLocations.length > 0 ? (
+                      <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">✓</span>
+                    ) : (
+                      <AlertTriangle size={18} className="text-amber-600" />
+                    )}
+                  </div>
+                  <div className="space-y-1.5 text-xs w-full">
+                    <span className="font-semibold text-gray-900">Registered Pickup Warehouse:</span>
+                    {shiprocketStatusResult.detectedPickupLocations && shiprocketStatusResult.detectedPickupLocations.length > 0 ? (
+                      <div className="space-y-2 bg-white p-2.5 rounded-lg border border-gray-200">
+                        {shiprocketStatusResult.detectedPickupLocations.map((loc, idx) => (
+                          <div key={idx} className="flex justify-between items-start text-xs border-b border-gray-100 last:border-b-0 pb-1.5 last:pb-0">
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-timber-darkwood font-mono">{loc.location}</span>
+                                {loc.isPrimary && <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-semibold">Primary</span>}
+                              </div>
+                              <p className="text-gray-500 mt-0.5">{loc.address}</p>
+                            </div>
+                            <span className="text-gray-400 font-mono text-[11px] shrink-0 ml-2">{loc.phone}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 text-amber-900 space-y-1">
+                        <p className="font-medium">No pickup address registered in Shiprocket!</p>
+                        <p className="text-[11px] leading-relaxed">
+                          Shiprocket requires at least one pickup location before couriers can collect orders. Log in to <a href="https://app.shiprocket.in" target="_blank" rel="noopener noreferrer" className="underline font-semibold">app.shiprocket.in</a>, navigate to <b>Settings → Pickup Addresses</b>, and add your workshop address.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Action Summary & Checklist */}
+                <div className="p-4 rounded-xl bg-timber-teal/5 border border-timber-teal/20 text-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-timber-darkwood uppercase tracking-wider text-[11px]">Dispatch Readiness Checklist</span>
+                    <span className={`px-2 py-0.5 rounded-md font-bold text-[11px] ${
+                      shiprocketStatusResult.ready ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                    }`}>
+                      {shiprocketStatusResult.ready ? "READY FOR DISPATCH" : "ACTION REQUIRED"}
+                    </span>
+                  </div>
+                  <ul className="space-y-1.5 text-gray-600">
+                    <li className="flex items-center gap-2">
+                      <span className={shiprocketStatusResult.authenticated ? "text-emerald-600 font-bold" : "text-gray-400 font-bold"}>
+                        {shiprocketStatusResult.authenticated ? "✓" : "○"}
+                      </span>
+                      Shiprocket Account Credentials (email &amp; password verified)
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className={shiprocketStatusResult.detectedPickupLocations?.length ? "text-emerald-600 font-bold" : "text-gray-400 font-bold"}>
+                        {shiprocketStatusResult.detectedPickupLocations?.length ? "✓" : "○"}
+                      </span>
+                      Warehouse Pickup Location (configured on Shiprocket)
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-blue-600 font-bold">ℹ</span>
+                      Shiprocket Wallet Balance (ensure ₹200+ recharge in Shiprocket panel to generate AWB)
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => setShowShiprocketModal(false)}
+                    className="px-5 py-2.5 bg-timber-darkwood text-timber-beige hover:bg-timber-teal rounded-xl text-xs font-semibold transition cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       )}
