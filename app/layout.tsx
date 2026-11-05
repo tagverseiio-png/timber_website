@@ -41,6 +41,15 @@ export const metadata: Metadata = {
       "Premium handcrafted timber furniture — sustainably sourced solid wood, built for generations.",
     images: [canonical("/images/logo.png")],
   },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+      { url: "/images/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: "/favicon.ico",
+  },
   manifest: "/manifest.webmanifest",
 };
 

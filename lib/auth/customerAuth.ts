@@ -5,7 +5,7 @@ import {
   updateProfile,
   type User,
 } from "firebase/auth";
-import { ref, get, set, update, serverTimestamp } from "firebase/database";
+import { ref, get, set, update, serverTimestamp, onValue } from "firebase/database";
 import { auth, database } from "@/lib/firebase";
 
 export interface CustomerProfile {
@@ -185,4 +185,73 @@ export async function getCustomerOrders(uid: string): Promise<CustomerOrder[]> {
     console.error("Failed to fetch customer orders:", error);
     return [];
   }
+}
+
+/**
+ * Real-time subscription to a customer's orders.
+ * Automatically updates whenever an admin changes status, assigns AWB, or updates notes.
+ */
+export function subscribeToCustomerOrders(
+  uid: string,
+  onUpdate: (orders: CustomerOrder[]) => void
+): () => void {
+  const userOrdersRef = ref(database, `userOrders/${uid}`);
+  const orderUnsubs: Record<string, () => void> = {};
+  const ordersMap: Record<string, CustomerOrder> = {};
+
+  const broadcast = () => {
+    const list = Object.values(ordersMap).sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    onUpdate(list);
+  };
+
+  const mainUnsub = onValue(
+    userOrdersRef,
+    (snap) => {
+      if (!snap.exists()) {
+        getCustomerOrders(uid).then(onUpdate);
+        return;
+      }
+      const orderKeys = Object.keys(snap.val() as Record<string, unknown>);
+
+      // Clean up unsubs for removed keys
+      for (const key of Object.keys(orderUnsubs)) {
+        if (!orderKeys.includes(key)) {
+          orderUnsubs[key]();
+          delete orderUnsubs[key];
+          delete ordersMap[key];
+        }
+      }
+
+      // Attach live listener for each order
+      for (const key of orderKeys) {
+        if (!orderUnsubs[key]) {
+          const oRef = ref(database, `orders/${key}`);
+          orderUnsubs[key] = onValue(
+            oRef,
+            (oSnap) => {
+              if (oSnap.exists()) {
+                ordersMap[key] = { ...(oSnap.val() as CustomerOrder), id: key };
+              } else {
+                delete ordersMap[key];
+              }
+              broadcast();
+            },
+            () => {
+              // Ignore individual read errors
+            }
+          );
+        }
+      }
+      broadcast();
+    },
+    (err) => {
+      console.warn("Real-time orders subscription fallback:", err.message);
+      getCustomerOrders(uid).then(onUpdate);
+    }
+  );
+
+  return () => {
+    mainUnsub();
+    Object.values(orderUnsubs).forEach((u) => u());
+  };
 }

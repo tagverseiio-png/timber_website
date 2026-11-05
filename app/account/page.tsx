@@ -7,7 +7,7 @@ import { auth } from "@/lib/firebase";
 import {
   getCustomerProfile,
   updateCustomerProfile,
-  getCustomerOrders,
+  subscribeToCustomerOrders,
   signOutCustomer,
   type CustomerOrder,
 } from "@/lib/auth/customerAuth";
@@ -48,7 +48,8 @@ export default function CustomerAccountPage() {
   const [pincode, setPincode] = useState("");
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (currentUser) => {
+    let unsubOrders: (() => void) | null = null;
+    const unsubAuth = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser || currentUser.isAnonymous) {
         router.replace("/account/login?redirect=/account");
         return;
@@ -57,13 +58,9 @@ export default function CustomerAccountPage() {
       setUser(currentUser);
       setName(currentUser.displayName || "");
 
-      // Load Profile & Orders in parallel
+      // Load Profile & Subscribe to live Orders
       try {
-        const [userProfile, userOrders] = await Promise.all([
-          getCustomerProfile(currentUser.uid),
-          getCustomerOrders(currentUser.uid),
-        ]);
-
+        const userProfile = await getCustomerProfile(currentUser.uid);
         if (userProfile) {
           if (userProfile.name) setName(userProfile.name);
           if (userProfile.phone) setPhone(userProfile.phone);
@@ -76,15 +73,22 @@ export default function CustomerAccountPage() {
           }
         }
 
-        setOrders(userOrders);
+        // Live real-time orders subscription
+        unsubOrders?.();
+        unsubOrders = subscribeToCustomerOrders(currentUser.uid, (liveOrders) => {
+          setOrders(liveOrders);
+          setLoading(false);
+        });
       } catch (err) {
         console.error("Error loading account data:", err);
-      } finally {
         setLoading(false);
       }
     });
 
-    return () => unsub();
+    return () => {
+      unsubAuth();
+      unsubOrders?.();
+    };
   }, [router]);
 
   const handleSignOut = async () => {
@@ -139,6 +143,9 @@ export default function CustomerAccountPage() {
         return <span className="px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full">Out of Stock</span>;
       case "refunded":
         return <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">Refunded</span>;
+      case "failed":
+        return <span className="px-3 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded-full">Payment Failed</span>;
+      case "pending":
       default:
         return <span className="px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full">Payment Pending</span>;
     }
@@ -343,6 +350,16 @@ export default function CustomerAccountPage() {
                           <p className="font-semibold">Refund Processed</p>
                           <p className="text-yellow-800 mt-0.5">
                             {order.adminNotes || "A refund has been issued for this order. It will reflect back in your original payment account within 3-5 business days."}
+                          </p>
+                        </div>
+                      </div>
+                    ) : order.status === "failed" ? (
+                      <div className="my-4 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-start gap-2.5">
+                        <AlertCircle size={16} className="shrink-0 text-red-600 mt-0.5" />
+                        <div>
+                          <p className="font-semibold">Payment Failed</p>
+                          <p className="text-red-700 mt-0.5">
+                            {order.adminNotes || "Payment for this order was not completed. If any funds were deducted, your issuing bank will automatically credit them back within 3-5 business days."}
                           </p>
                         </div>
                       </div>

@@ -2242,9 +2242,14 @@ export default function AdminPanel() {
         <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="font-serif text-2xl md:text-3xl text-timber-darkwood font-bold">
-                TIMBER.
-              </h1>
+              <Image
+                src="/images/logo-transparent.png"
+                alt="Timber Logo"
+                width={120}
+                height={38}
+                className="object-contain"
+                priority
+              />
               <span className="text-[11px] uppercase tracking-widest font-semibold px-2.5 py-1 bg-timber-teal/10 text-timber-teal rounded-full">
                 Admin Console
               </span>
