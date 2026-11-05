@@ -245,7 +245,17 @@ export function validateAddress(input) {
     })(requireText(input, "pincode", 6, 6, "Pincode")),
   };
 }
-/** Admin-gate: like requireUserId, but the token must carry admin:true. */
+/** Authorized admin emails (matches lib/auth/admin.ts) */
+const AUTHORIZED_ADMIN_EMAILS = [
+  "admin@timber_ts.com",
+  "admin@timber-ts.com",
+  "admin@tgtimber.com",
+  "admin@tg-timber.com",
+  "admin@tg.timber",
+  "admin@timberteak.com",
+];
+
+/** Admin-gate: token carries admin:true OR comes from an authorized admin email. */
 export async function requireAdmin(req) {
   const header = req.headers.authorization ?? "";
   if (!header.startsWith("Bearer ")) {
@@ -255,7 +265,10 @@ export async function requireAdmin(req) {
   }
   try {
     const decoded = await auth.verifyIdToken(header.slice(7));
-    if (decoded.admin !== true) {
+    const isEmailAdmin =
+      decoded.email &&
+      AUTHORIZED_ADMIN_EMAILS.includes(decoded.email.toLowerCase().trim());
+    if (decoded.admin !== true && !isEmailAdmin) {
       const err = new Error("Admin only.");
       err.status = 403;
       throw err;

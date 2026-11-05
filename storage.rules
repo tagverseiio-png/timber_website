@@ -7,7 +7,8 @@ service firebase.storage {
     match /products/{allPaths=**} {
       allow read: if true;
       allow write: if request.auth != null
-        && request.auth.token.admin == true
+        && (request.auth.token.admin == true
+            || (request.auth.token.email != null && request.auth.token.email.matches('(?i)^(admin@timber_ts\\.com|admin@tgtimber\\.com|admin@timberteak\\.com|admin@timber-ts\\.com)$')))
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/(jpeg|png|webp)');
     }

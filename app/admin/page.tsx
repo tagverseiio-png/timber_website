@@ -18,11 +18,12 @@ import {
 import { auth, database } from "@/lib/firebase";
 import {
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   type User,
 } from "firebase/auth";
-import { hasAdminClaim } from "@/lib/auth/admin";
+import { hasAdminClaim, isAuthorizedAdminEmail } from "@/lib/auth/admin";
 import { env } from "@/lib/env";
 import { postToPaymentApi } from "@/lib/razorpay";
 import {
@@ -859,9 +860,29 @@ export default function AdminPanel() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
+    const cleanEmail = email.trim();
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, cleanEmail, password);
     } catch (error: unknown) {
+      const err = error as { code?: string; message?: string };
+      // If user does not exist yet in Firebase Auth, and is an authorized admin, auto-create
+      if (
+        (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") &&
+        isAuthorizedAdminEmail(cleanEmail)
+      ) {
+        try {
+          await createUserWithEmailAndPassword(auth, cleanEmail, password);
+          return;
+        } catch (createErr: unknown) {
+          const cErr = createErr as { code?: string; message?: string };
+          if (cErr.code === "auth/email-already-in-use") {
+            setLoginError("Invalid password for this admin account.");
+          } else {
+            setLoginError(cErr.message || "Login failed. Check your password.");
+          }
+          return;
+        }
+      }
       setLoginError(error instanceof Error ? error.message : "Login failed.");
     }
   };
