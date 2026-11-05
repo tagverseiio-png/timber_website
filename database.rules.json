@@ -1,50 +1,40 @@
 {
   "rules": {
-    // Products live under /projects (historical node name — see Phase 4 plan
-    // to migrate to /products with a paise-based schema).
-    // Public can read ACTIVE products; admins (custom claim or authorized admin email) can write.
     "projects": {
       ".read": true,
-      ".write": "auth != null && (auth.token.admin === true || (auth.token.email != null && (auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com' || auth.token.email.matches('(?i)^(admin@timber_ts\\.com|admin@timber-ts\\.com|admin@tgtimber\\.com|admin@timberteak\\.com)$'))))",
+      ".write": "auth != null && (auth.token.admin === true || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com')",
       ".indexOn": ["category", "isActive", "orderIndex"]
     },
-    // Orders (created by the payment VM; clients get read on their own orders; admins read all):
     "orders": {
-      ".read": "auth != null && (auth.token.admin === true || (auth.token.email != null && (auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com' || auth.token.email.matches('(?i)^(admin@timber_ts\\.com|admin@timber-ts\\.com|admin@tgtimber\\.com|admin@timberteak\\.com)$'))))",
+      ".read": "auth != null && (auth.token.admin === true || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com')",
       ".indexOn": ["userId", "status", "createdAt"],
       "$orderId": {
-        ".read": "auth != null && (auth.token.admin === true || (auth.token.email != null && (auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com' || auth.token.email.matches('(?i)^(admin@timber_ts\\.com|admin@timber-ts\\.com|admin@tgtimber\\.com|admin@timberteak\\.com)$')))) || data.child('userId').val() === auth.uid)",
-        ".write": "auth != null && (auth.token.admin === true || (auth.token.email != null && (auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com' || auth.token.email.matches('(?i)^(admin@timber_ts\\.com|admin@timber-ts\\.com|admin@tgtimber\\.com|admin@timberteak\\.com)$'))))"
+        ".read": "auth != null && (auth.token.admin === true || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com' || data.child('userId').val() === auth.uid)",
+        ".write": "auth != null && (auth.token.admin === true || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com')"
       }
     },
-    // Webhook idempotency keys (written by the VM only; clients get nothing).
     "webhookEvents": {
-      ".read": "auth != null && (auth.token.admin === true || (auth.token.email != null && (auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com' || auth.token.email.matches('(?i)^(admin@timber_ts\\.com|admin@timber-ts\\.com|admin@tgtimber\\.com|admin@timberteak\\.com)$'))))",
-      ".write": "auth != null && (auth.token.admin === true || (auth.token.email != null && (auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com' || auth.token.email.matches('(?i)^(admin@timber_ts\\.com|admin@timber-ts\\.com|admin@tgtimber\\.com|admin@timberteak\\.com)$'))))"
+      ".read": "auth != null && (auth.token.admin === true || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com')",
+      ".write": "auth != null && (auth.token.admin === true || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com')"
     },
-    // Customer inquiries submitted via /contact:
-    // - Authenticated users (including anonymous guest sessions) may create a new inquiry
-    // - Admins may read, update status, and remove inquiries
     "inquiries": {
-      ".read": "auth != null && (auth.token.admin === true || (auth.token.email != null && (auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com' || auth.token.email.matches('(?i)^(admin@timber_ts\\.com|admin@timber-ts\\.com|admin@tgtimber\\.com|admin@timberteak\\.com)$'))))",
+      ".read": "auth != null && (auth.token.admin === true || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com')",
       ".indexOn": ["createdAt", "status"],
       "$inquiryId": {
-        ".write": "auth != null && (!data.exists() || auth.token.admin === true || (auth.token.email != null && (auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com' || auth.token.email.matches('(?i)^(admin@timber_ts\\.com|admin@timber-ts\\.com|admin@tgtimber\\.com|admin@timberteak\\.com)$'))))",
+        ".write": "auth != null && (!data.exists() || auth.token.admin === true || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com')",
         ".validate": "newData.hasChildren(['name', 'email', 'message', 'createdAt', 'status', 'uid'])"
       }
     },
-    // Customer profile records and default delivery address
     "users": {
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true || (auth.token.email != null && (auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com' || auth.token.email.matches('(?i)^(admin@timber_ts\\.com|admin@timber-ts\\.com|admin@tgtimber\\.com|admin@timberteak\\.com)$'))))",
-        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true || (auth.token.email != null && (auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com' || auth.token.email.matches('(?i)^(admin@timber_ts\\.com|admin@timber-ts\\.com|admin@tgtimber\\.com|admin@timberteak\\.com)$'))))"
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com')",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com')"
       }
     },
-    // Index of orders placed by customer (for direct user lookup)
     "userOrders": {
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true || (auth.token.email != null && (auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com' || auth.token.email.matches('(?i)^(admin@timber_ts\\.com|admin@timber-ts\\.com|admin@tgtimber\\.com|admin@timberteak\\.com)$'))))",
-        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true || (auth.token.email != null && (auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com' || auth.token.email.matches('(?i)^(admin@timber_ts\\.com|admin@timber-ts\\.com|admin@tgtimber\\.com|admin@timberteak\\.com)$'))))"
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com')",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true || auth.token.email == 'admin@timber-ts.com' || auth.token.email == 'Admin@timber-ts.com' || auth.token.email == 'admin@timber_ts.com' || auth.token.email == 'Admin@timber_TS.com' || auth.token.email == 'admin@tgtimber.com' || auth.token.email == 'admin@timberteak.com')"
       }
     }
   }
