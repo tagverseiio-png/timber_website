@@ -36,6 +36,7 @@ export function GalleryLightboxModal({
               src={item.imageUrl}
               alt={item.title}
               fill
+              unoptimized={item.imageUrl.startsWith("data:")}
               className="object-contain"
             />
           )}

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { Eye, EyeOff, Maximize2, Pencil, Trash2 } from "lucide-react";
+import { DatabaseZap, Eye, EyeOff, Maximize2, Pencil, Trash2 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { hasAdminClaim } from "@/lib/auth/admin";
 import {
@@ -17,9 +17,18 @@ import {
 } from "@/lib/gallery/types";
 import {
   deleteGalleryPhoto,
+  setAllGalleryVisibility,
   setGalleryPhotoVisibility,
+  showOnlySelectedGalleryPhotos,
   subscribeGalleryPhotos,
+  upsertGalleryBase64Photo,
 } from "@/lib/gallery/service";
+import { fetchImageUrlToBase64 } from "@/lib/gallery/base64";
+import {
+  ALL_WEBSITE_GALLERY_SEEDS,
+  GALLERY_PAGE_SEEDS,
+  type WebsiteGallerySeed,
+} from "@/lib/gallery/website_seed";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import {
   AdminAccessDeniedCard,
@@ -63,6 +72,11 @@ export default function AdminGalleryPage() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [seedProgress, setSeedProgress] = useState<{
+    current: number;
+    total: number;
+    title: string;
+  } | null>(null);
   const [editingItem, setEditingItem] = useState<GalleryItem | null>(null);
   const [previewItem, setPreviewItem] = useState<GalleryItem | null>(null);
 
@@ -173,23 +187,57 @@ export default function AdminGalleryPage() {
     }
   };
 
-  const runBulkVisibility = async (isActive: boolean) => {
-    if (selectedIds.length === 0) return;
+  const runBulkTask = async (
+    action: () => Promise<void>,
+    successMessage: string,
+    fallbackError: string
+  ) => {
     setBulkBusy(true);
     try {
-      await Promise.all(
-        selectedIds.map((id) => setGalleryPhotoVisibility(id, isActive))
-      );
-      notify(
-        "success",
-        `${selectedIds.length} photo(s) ${isActive ? "shown" : "hidden"}.`
-      );
+      await action();
+      notify("success", successMessage);
       setSelectedIds([]);
     } catch (err: unknown) {
-      notify("error", err instanceof Error ? err.message : "Bulk update failed.");
+      notify("error", err instanceof Error ? err.message : fallbackError);
     } finally {
       setBulkBusy(false);
     }
+  };
+
+  const runBulkVisibility = async (isActive: boolean) => {
+    if (selectedIds.length === 0) return;
+    await runBulkTask(
+      async () => {
+        await Promise.all(
+          selectedIds.map((id) => setGalleryPhotoVisibility(id, isActive))
+        );
+      },
+      `${selectedIds.length} photo(s) ${isActive ? "shown on" : "hidden from"} public Gallery.`,
+      "Bulk update failed."
+    );
+  };
+
+  const runShowOnlySelected = async () => {
+    if (selectedIds.length === 0) return;
+    await runBulkTask(
+      () =>
+        showOnlySelectedGalleryPhotos(
+          items.map((item) => item.id),
+          selectedIds
+        ),
+      `Now showing only ${selectedIds.length} selected photo(s) on the public Gallery.`,
+      "Show-only update failed."
+    );
+  };
+
+  const runHideAll = async () => {
+    const activeIds = items.filter((item) => item.isActive).map((item) => item.id);
+    if (activeIds.length === 0) return;
+    await runBulkTask(
+      () => setAllGalleryVisibility(activeIds, false),
+      `Hid all ${activeIds.length} live photo(s). Select photos and click Show to publish.`,
+      "Failed to hide gallery photos."
+    );
   };
 
   const runBulkDelete = async () => {
@@ -214,6 +262,56 @@ export default function AdminGalleryPage() {
     }
   };
 
+  const pushWebsiteSeedBase64 = async (
+    seeds: WebsiteGallerySeed[],
+    label: string
+  ) => {
+    if (
+      !window.confirm(
+        `Convert ${seeds.length} ${label} to Base64 URLs and push them to Firebase Gallery Management?`
+      )
+    ) {
+      return;
+    }
+
+    let uploaded = 0;
+    let failed = 0;
+    let lastError = "";
+
+    for (let i = 0; i < seeds.length; i++) {
+      const seed = seeds[i];
+      setSeedProgress({ current: i + 1, total: seeds.length, title: seed.title });
+      try {
+        const converted = await fetchImageUrlToBase64(seed.imagePath);
+        const fileName = seed.imagePath.split("/").pop() || `${seed.id}.jpg`;
+        await upsertGalleryBase64Photo(seed.id, {
+          title: seed.title,
+          description: seed.description,
+          category: seed.category,
+          orderIndex: seed.orderIndex,
+          isActive: seed.defaultActive,
+          imageUrl: converted.dataUrl,
+          fileName,
+          fileSize: converted.byteSize,
+          contentType: converted.contentType,
+        });
+        uploaded++;
+      } catch (err: unknown) {
+        failed++;
+        lastError = err instanceof Error ? err.message : "Upload failed";
+      }
+    }
+
+    setSeedProgress(null);
+    if (uploaded > 0 && failed === 0) {
+      notify("success", `Pushed ${uploaded} Base64 images to Firebase Gallery Management!`);
+    } else if (uploaded > 0) {
+      notify("error", `Pushed ${uploaded} images; ${failed} failed (${lastError}).`);
+    } else {
+      notify("error", lastError || "Failed to push images to Firestore.");
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-timber-beige flex items-center justify-center font-serif">
@@ -232,7 +330,15 @@ export default function AdminGalleryPage() {
     );
   }
 
-  const allCategories = ["All", ...GALLERY_CATEGORIES];
+  const activeCount = items.filter((item) => item.isActive).length;
+  const usedCategories = Array.from(new Set(items.map((item) => item.category)));
+  const orderedCategories = [
+    ...GALLERY_CATEGORIES.filter((cat) => usedCategories.includes(cat)),
+    ...usedCategories.filter(
+      (cat) => !GALLERY_CATEGORIES.includes(cat as (typeof GALLERY_CATEGORIES)[number])
+    ),
+  ];
+  const allCategories = ["All", ...(orderedCategories.length > 0 ? orderedCategories : GALLERY_CATEGORIES)];
   const allOnPageSelected =
     paged.length > 0 && paged.every((item) => selectedIds.includes(item.id));
 
@@ -275,6 +381,74 @@ export default function AdminGalleryPage() {
         />
 
         <GalleryUploadPanel nextOrderIndex={nextOrderIndex} notify={notify} />
+
+        {/* Website & Gallery Base64 Seed Sync */}
+        <div className="bg-white p-6 rounded-lg shadow-sm mb-8 border-l-4 border-timber-teal">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-serif text-timber-darkwood">
+                Import Website &amp; Gallery Images (Base64)
+              </h2>
+              <p className="text-gray-600 text-sm mt-1 max-w-2xl">
+                Convert existing Gallery page photos ({GALLERY_PAGE_SEEDS.length}) or all website
+                furniture &amp; showcase photos ({ALL_WEBSITE_GALLERY_SEEDS.length}) to Base64 data
+                URLs and push them directly to Firebase Firestore Gallery Management.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 shrink-0">
+              <button
+                type="button"
+                disabled={!!seedProgress}
+                onClick={() =>
+                  pushWebsiteSeedBase64(GALLERY_PAGE_SEEDS, "gallery page images")
+                }
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-timber-teal border border-timber-teal/30 rounded-md hover:bg-timber-teal/5 transition text-sm font-medium disabled:opacity-50"
+              >
+                <DatabaseZap className="w-4 h-4" />
+                <span>Push Gallery Page ({GALLERY_PAGE_SEEDS.length})</span>
+              </button>
+              <button
+                type="button"
+                disabled={!!seedProgress}
+                onClick={() =>
+                  pushWebsiteSeedBase64(
+                    ALL_WEBSITE_GALLERY_SEEDS,
+                    "website & gallery images"
+                  )
+                }
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-timber-teal text-white rounded-md hover:bg-timber-darkwood transition text-sm font-medium disabled:opacity-50"
+              >
+                <DatabaseZap className="w-4 h-4" />
+                <span>
+                  {seedProgress
+                    ? `Pushing ${seedProgress.current}/${seedProgress.total}…`
+                    : `Push All Website Images (${ALL_WEBSITE_GALLERY_SEEDS.length})`}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {seedProgress && (
+            <div className="mt-4">
+              <div className="flex items-center gap-3 mb-1.5">
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div
+                    className="bg-timber-teal h-2.5 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${(seedProgress.current / seedProgress.total) * 100}%`,
+                    }}
+                  />
+                </div>
+                <span className="text-xs font-medium text-gray-700 whitespace-nowrap">
+                  {seedProgress.current}/{seedProgress.total}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500">
+                Converting to Base64 &amp; pushing: <strong>{seedProgress.title}</strong>
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Search & filter bar */}
         <div className="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-col md:flex-row gap-3 md:items-center">
@@ -328,10 +502,16 @@ export default function AdminGalleryPage() {
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-xl font-serif text-timber-darkwood">
-                Gallery Photos ({filtered.length}
-                {filtered.length !== items.length ? ` of ${items.length}` : ""})
-              </h2>
+              <div>
+                <h2 className="text-xl font-serif text-timber-darkwood">
+                  Gallery Photos ({filtered.length}
+                  {filtered.length !== items.length ? ` of ${items.length}` : ""})
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {activeCount} Live on public Gallery &middot;{" "}
+                  {items.length - activeCount} Hidden
+                </p>
+              </div>
               {paged.length > 0 && (
                 <button
                   type="button"
@@ -339,6 +519,16 @@ export default function AdminGalleryPage() {
                   className="text-xs px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition font-medium"
                 >
                   {allOnPageSelected ? "Unselect Page" : "Select Page"}
+                </button>
+              )}
+              {activeCount > 0 && (
+                <button
+                  type="button"
+                  disabled={bulkBusy}
+                  onClick={runHideAll}
+                  className="text-xs px-3 py-1 border border-amber-300 text-amber-800 rounded-md hover:bg-amber-50 transition font-medium disabled:opacity-50"
+                >
+                  Hide All ({activeCount})
                 </button>
               )}
             </div>
@@ -355,6 +545,15 @@ export default function AdminGalleryPage() {
                   className="px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition text-xs font-medium disabled:opacity-50"
                 >
                   Show
+                </button>
+                <button
+                  type="button"
+                  disabled={bulkBusy}
+                  onClick={runShowOnlySelected}
+                  title="Show only the selected photos on the public Gallery and hide all others"
+                  className="px-3 py-1.5 bg-timber-teal text-white rounded-md hover:bg-timber-teal/90 transition text-xs font-medium disabled:opacity-50"
+                >
+                  Show Only Selected
                 </button>
                 <button
                   type="button"
@@ -389,7 +588,16 @@ export default function AdminGalleryPage() {
               <p className="text-red-600 font-medium mb-2">Couldn&apos;t load gallery photos</p>
               <p className="text-gray-500 text-sm">{listError}</p>
               <p className="text-gray-500 text-xs mt-2">
-                Ensure Firestore is enabled and firestore.rules allow admin reads on /gallery.
+                Ensure Cloud Firestore is created in your Firebase project (
+                <a
+                  href="https://console.cloud.google.com/datastore/setup?project=timber-15a4d"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-timber-teal underline"
+                >
+                  enable Firestore
+                </a>
+                ) and <code>firestore.rules</code> are deployed.
               </p>
             </div>
           ) : paged.length === 0 ? (
@@ -417,6 +625,7 @@ export default function AdminGalleryPage() {
                           src={item.imageUrl}
                           alt={item.title}
                           fill
+                          unoptimized={item.imageUrl.startsWith("data:")}
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                           className="object-cover group-hover:scale-105 transition-transform duration-500"
                         />

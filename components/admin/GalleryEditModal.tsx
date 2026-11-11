@@ -125,7 +125,7 @@ export function GalleryEditModal({
                   src={previewUrl}
                   alt={item.title}
                   fill
-                  unoptimized={previewUrl.startsWith("blob:")}
+                  unoptimized={previewUrl.startsWith("blob:") || previewUrl.startsWith("data:")}
                   className="object-cover"
                 />
               )}
