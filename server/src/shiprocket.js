@@ -1,0 +1,607 @@
+import crypto from "node:crypto";
+import { config } from "./config.js";
+import { db } from "./firebase.js";
+import { requireAdmin } from "./orders.js";
+
+/**
+ * Shiprocket integration — SEMI-AUTO fulfillment.
+ *
+ * Pipeline: Razorpay webhook marks the order `paid` → an ADMIN reviews it and
+ * calls POST /fulfill {orderId} → the VM creates the shipment on Shiprocket →
+ * Phoneix webhooks drive status updates forward. Shiprocket cannot sign its
+ * webhook payloads, so authentication uses HTTP Basic (admin panel setting)
+ * when SHIPROCKET_WEBHOOK_BASIC is configured, plus schema sanity checks,
+ * idempotency keys and cross-checks against known orders.
+ */
+
+// Shiprocket v1 external API — base MUST include /external per current docs.
+// (the legacy /v1/authentications path was retired by Shiprocket and 404s).
+const BASE = "https://apiv2.shiprocket.in/v1/external";
+const AUTH_URL = `${BASE}/auth/login`;
+// Token is valid ~10 days; refresh after 8 to leave a safety margin.
+const TOKEN_TTL_MS = 8 * 24 * 60 * 60 * 1000;
+
+let tokenCache = { token: "", fetchedAt: 0 };
+
+class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function needShiprocketConfig() {
+  const c = config.shiprocket;
+  if (!c.email || !c.password) {
+    throw new HttpError(
+      503,
+      "Shiprocket is not configured on the VM (set SHIPROCKET_EMAIL / SHIPROCKET_PASSWORD)."
+    );
+  }
+  return c;
+}
+
+async function refreshShiprocketToken() {
+  const c = needShiprocketConfig();
+  const res = await fetch(AUTH_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: c.email, password: c.password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || typeof data.token !== "string" || !data.token) {
+    const errorDetail =
+      data.message ||
+      (typeof data.errors === "object" ? JSON.stringify(data.errors) : "") ||
+      "Invalid credentials or Shiprocket service unavailable";
+    console.error("[shiprocket] auth failed:", res.status, errorDetail);
+    throw new HttpError(
+      res.status === 401 ? 401 : 502,
+      `Shiprocket authentication failed (${res.status}): ${errorDetail}`
+    );
+  }
+  tokenCache = { token: data.token, fetchedAt: Date.now() };
+  return data.token;
+}
+
+async function shiprocketToken() {
+  if (tokenCache.token && Date.now() - tokenCache.fetchedAt < TOKEN_TTL_MS) {
+    return tokenCache.token;
+  }
+  return refreshShiprocketToken();
+}
+
+async function srRequest(path, body, { retryOn401 = true, method = "POST" } = {}) {
+  const token = await shiprocketToken();
+  // /courier/serviceability is GET-only on the current API (POST → 405);
+  // parameters ride in the query string instead of a body.
+  const usesQuery = method === "GET" && body && Object.keys(body).length > 0;
+  const url = usesQuery ? `${BASE}${path}?${new URLSearchParams(body)}` : `${BASE}${path}`;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    ...(method === "GET" ? {} : { body: JSON.stringify(body) }),
+  });
+  if (res.status === 401 && retryOn401) {
+    tokenCache = { token: "", fetchedAt: 0 };
+    return srRequest(path, body, { retryOn401: false, method });
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const errorDetail =
+      data.message ||
+      (typeof data.errors === "object" ? JSON.stringify(data.errors) : "") ||
+      JSON.stringify(data);
+    console.error(`[shiprocket] ${path} ${res.status}:`, errorDetail.slice(0, 500));
+    throw new HttpError(res.status, `Shiprocket error (${res.status}): ${errorDetail}`);
+  }
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Parcel specs: total weight = Σ units × item weight; dims = largest item.
+// A missing weight is a hard error (courier pricing depends on it).
+// ---------------------------------------------------------------------------
+function parcelSpec(items) {
+  let grams = 0;
+  let L = 0;
+  let W = 0;
+  let H = 0;
+  let missing = [];
+  for (const item of items) {
+    const w =
+      Number.isFinite(item.weightGrams) && item.weightGrams > 0
+        ? item.weightGrams
+        : config.shiprocket.defaultWeightGrams > 0
+          ? config.shiprocket.defaultWeightGrams
+          : null;
+    if (w == null) missing.push(item.name);
+    grams += (w ?? 0) * Number(item.qty);
+    L = Math.max(L, item.lengthCm ?? 0);
+    W = Math.max(W, item.widthCm ?? 0);
+    H = Math.max(H, item.heightCm ?? 0);
+  }
+  if (missing.length) {
+    throw new HttpError(
+      400,
+      `Add weightGrams (grams) for: ${missing.join(", ")}. ` +
+        "Edit the product, set SHIPROCKET_DEFAULT_WEIGHT_G, then retry."
+    );
+  }
+  return {
+    weight: Math.max(1, Math.round(grams)),
+    ...(L || W || H ? { length: Math.max(1, L), width: Math.max(1, W), height: Math.max(1, H) } : {}),
+  };
+}
+
+/** YYYY-MM-DD HH:mm — the format Shiprocket's create-order API accepts. */
+function shiprocketDate(ms) {
+  const d = new Date(ms);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+}
+
+/**
+ * GET /courier/serviceability — the ONLY signature the current API accepts,
+ * with the weight in KILOGRAMS (grams → zero couriers). Explicit
+ * pickup_postcode + delivery_postcode are required (legacy `postcode`
+ * silently yields zero couriers). Returns normalized couriers:
+ * [{name, etaDate, rate}] — rate is the quoted price in RUPEES.
+ */
+async function fetchServiceability(deliveryPostcode, weightGrams) {
+  const c = needShiprocketConfig();
+  const body = {
+    cod: "0",
+    weight: Math.max(0.05, weightGrams / 1000),
+    md: "1",
+    pickup_postcode: /^[1-9]\d{5}$/.test(c.pickupPincode) ? c.pickupPincode : "600034",
+    delivery_postcode: deliveryPostcode,
+  };
+  const data = await srRequest("/courier/serviceability", body, { method: "GET" });
+  return (data?.data?.available_courier_companies ?? []).map((co) => ({
+    name: co.courier_name,
+    etaDate: co.estimated_delivery_date ?? "",
+    rate: Number(co.rate ?? 0),
+  }));
+}
+
+/**
+ * The cheapest courier for a real parcel (build the parcel spec from the
+ * actual order items — per-item weights with the configured fallback).
+ * Returns {name, etaDate, rate} in RUPEES, or null when the pincode is
+ * unserviceable. Throws like the rest of the module on Shiprocket outages —
+ * callers must NOT ship (or charge) based on a guess.
+ */
+export async function quoteCheapestCourier(items, deliveryPostcode) {
+  const spec = parcelSpec(items);
+  const couriers = await fetchServiceability(deliveryPostcode, spec.weight);
+  let best = null;
+  for (const co of couriers) {
+    if (Number.isFinite(co.rate) && co.rate > 0 && (!best || co.rate < best.rate)) best = co;
+  }
+  return best;
+}
+
+async function getPickupLocationName() {
+  const c = config.shiprocket;
+  if (c.pickupLocation) return c.pickupLocation;
+
+  try {
+    const pRes = await srRequest("/settings/company/pickup", {}, { method: "GET" });
+    const addrs = pRes?.data?.shipping_address;
+    if (Array.isArray(addrs) && addrs.length > 0) {
+      const primary = addrs.find((a) => a.is_primary_location === 1) || addrs[0];
+      if (primary?.pickup_location) {
+        return primary.pickup_location;
+      }
+    }
+  } catch (err) {
+    console.warn("[shiprocket] failed to resolve dynamic pickup location:", err.message);
+  }
+  return "Primary";
+}
+
+/**
+ * POST /fulfill {orderId} — admin action ("Approve & Ship").
+ * Creates the Shiprocket order for a PAID order and assigns an AWB.
+ * Idempotent: rerunning returns the existing shipment data unchanged.
+ */
+export async function fulfill(req, res, next) {
+  try {
+    const adminUid = await requireAdmin(req);
+    const orderId = typeof req.body?.orderId === "string" ? req.body.orderId.trim() : "";
+    if (!orderId || orderId.length > 100) {
+      throw new HttpError(400, "orderId is required.");
+    }
+
+    const snap = await db.ref(`orders/${orderId}`).get();
+    const order = snap.val();
+    if (!order) throw new HttpError(404, "Order not found.");
+
+    if (order.shiprocket?.orderId && (order.status === "processing" || order.status === "shipped")) {
+      return res.json({ ok: true, already: true, shiprocket: order.shiprocket });
+    }
+    if (order.status !== "paid") {
+      throw new HttpError(409, `Order status is "${order.status}" — only paid orders can be shipped.`);
+    }
+
+    const sr = parcelSpec(order.items ?? []);
+    const c = config.shiprocket;
+
+    const fullName = (order.customer?.name ?? "Customer").trim();
+    const nameParts = fullName.split(/\s+/);
+    const firstName = nameParts[0] || "Customer";
+    const lastName = nameParts.slice(1).join(" ") || firstName;
+
+    // Shiprocket expects weight in KILOGRAMS (e.g. 500g -> 0.5kg)
+    const weightKg = Math.max(0.05, Number(((sr.weight ?? 500) / 1000).toFixed(2)));
+
+    const pickupLoc = await getPickupLocationName();
+
+    const address1 = (order.address?.line1 ?? "").trim();
+    const address2 = (order.address?.line2 ?? "").trim();
+    const rawAddress = [address1, address2].filter(Boolean).join(", ");
+    const billingAddress = rawAddress.length >= 10 ? rawAddress : `${rawAddress || "Address"}, India`;
+
+    const pincode = String(order.address?.pincode ?? "").replace(/\D/g, "");
+    if (!/^[1-9]\d{5}$/.test(pincode)) {
+      throw new HttpError(
+        400,
+        `Invalid delivery pincode "${order.address?.pincode || ""}". Must be a valid 6-digit Indian PIN code.`
+      );
+    }
+
+    const payload = {
+      order_id: orderId,
+      order_date: shiprocketDate(order.createdAt ?? Date.now()),
+      pickup_location: pickupLoc,
+      billing_customer_name: firstName,
+      billing_last_name: lastName,
+      billing_address: billingAddress,
+      billing_address_2: address2 || "",
+      billing_city: order.address?.city || "Chennai",
+      billing_pincode: pincode,
+      billing_state: order.address?.state || "Tamil Nadu",
+      billing_country: "India",
+      billing_phone: (order.customer?.phone ?? "").replace(/\D/g, "").slice(-10) || "9876543210",
+      billing_email: order.customer?.email ?? "support@timberteak.com",
+      shipping_is_billing: true,
+      order_items: (order.items ?? []).map((item) => ({
+        name: item.name,
+        sku: item.id || item.name.slice(0, 30),
+        units: Number(item.qty) || 1,
+        selling_price: (Number(item.pricePaise) || 0) / 100,
+      })),
+      payment_method: "Prepaid", // Razorpay = always prepaid
+      sub_total: Number(order.amountPaise) / 100,
+      weight: weightKg,
+      length: Math.max(1, sr.length || 10),
+      breadth: Math.max(1, sr.width || 10),
+      height: Math.max(1, sr.height || 10),
+    };
+
+    const created = await srRequest("/orders/create/adhoc", payload);
+    const shipmentId =
+      created.shipment_id ??
+      (Array.isArray(created.insert_data) ? created.insert_data[0]?.shipment_id : undefined) ??
+      "";
+    const shiprocketInfo = {
+      orderId: String(created.order_id ?? ""),
+      shipmentId: String(shipmentId ?? ""),
+      awb: String(created.awb_code ?? ""),
+      courierName: String(created.courier_name ?? ""),
+      state: "created",
+      createdAt: Date.now(),
+      by: adminUid,
+    };
+
+    // Assign AWB when we have a shipment id and AWB was not auto-assigned
+    if (shiprocketInfo.shipmentId && !shiprocketInfo.awb) {
+      try {
+        const awb = await srRequest("/courier/assign/awb", { shipment_id: shiprocketInfo.shipmentId });
+        shiprocketInfo.awb = String(
+          awb.response?.data?.awb_code ??
+            awb.data?.awb_number ??
+            awb.awb_code ??
+            awb.awb_number ??
+            ""
+        );
+        shiprocketInfo.courierName = String(
+          awb.response?.data?.courier_name ??
+            awb.data?.courier_name ??
+            awb.courier_name ??
+            ""
+        );
+      } catch (err) {
+        console.warn("[shiprocket] courier/assign/awb deferred:", err.message);
+      }
+    }
+
+    await db.ref(`orders/${orderId}`).update({
+      status: "processing",
+      shiprocket: shiprocketInfo,
+      updatedAt: Date.now(),
+    });
+
+    res.json({ ok: true, already: false, awb: shiprocketInfo.awb, courier: shiprocketInfo.courierName });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /shipping/quote {pincode, items?: [{id, qty}]} — public pre-payment
+ * check from the storefront: is the destination serviceable (prepaid), what's
+ * the ETA and what would shipping COST (cheapest courier)? When items are
+ * sent the parcel weight is computed from the CATALOG via the Admin SDK —
+ * the same source of truth /create-order charges from, so the estimate shown
+ * never diverges from the charge.
+ */
+export async function shippingQuote(req, res, next) {
+  try {
+    const pincode = typeof req.body?.pincode === "string" ? req.body.pincode.replace(/\D/g, "") : "";
+    if (!/^[1-9]\d{5}$/.test(pincode)) {
+      throw new HttpError(400, "pincode: 6 digits, first not 0.");
+    }
+
+    // Optional cart lines: only {id: string, qty: int 1–10}, max 50.
+    const rawItems = Array.isArray(req.body?.items) ? req.body.items.slice(0, 50) : [];
+    const lines = rawItems
+      .map((line) => {
+        const id = typeof line?.id === "string" ? line.id.trim() : "";
+        const qty = Number(line?.qty);
+        if (!id || id.length > 200 || !Number.isInteger(qty) || qty < 1 || qty > 10) return null;
+        return { id, qty };
+      })
+      .filter(Boolean);
+
+    let weightGrams;
+    if (lines.length > 0) {
+      const catalog = (await db.ref("projects").get()).val() ?? {};
+      const parcelItems = [];
+      for (const { id, qty } of lines) {
+        const row = catalog[id];
+        // Unknown/deleted cart lines: weight falls back to the item spec the
+        // storefront CAN'T know — display-only; /create-order still rejects
+        // unavailable items before any charge happens.
+        parcelItems.push({
+          name: row?.name ?? id,
+          qty,
+          weightGrams: row?.weightGrams == null ? null : Number(row.weightGrams),
+          lengthCm: 0,
+          widthCm: 0,
+          heightCm: 0,
+        });
+      }
+      weightGrams = parcelSpec(parcelItems).weight;
+    } else {
+      const fallback = Number(config.shiprocket.defaultWeightGrams);
+      weightGrams = Number.isFinite(fallback) && fallback > 0 ? fallback : 500;
+    }
+
+    const couriers = await fetchServiceability(pincode, weightGrams);
+    let cheapest = null;
+    for (const co of couriers) {
+      if (Number.isFinite(co.rate) && co.rate > 0 && (!cheapest || co.rate < cheapest.rate)) {
+        cheapest = co;
+      }
+    }
+    res.json({ serviceable: couriers.length > 0, couriers, cheapest });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Best-effort shipment cancel (used when refunding an order that was already
+ * handed to Shiprocket). Non-throwing: refund must never fail because the
+ * carrier cancel did — the webhook/RTO flow handles whatever remains.
+ */
+export async function cancelShipment(shipmentId) {
+  if (!shipmentId) return null;
+  try {
+    return await srRequest(`/orders/cancel/shipment/${encodeURIComponent(shipmentId)}`, {});
+  } catch (err) {
+    console.warn(`[shiprocket] cancel shipment ${shipmentId} failed (non-fatal):`, err.message);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Webhook: POST /webhooks/shiprocket
+// No cryptographic signature exists. Defense in depth:
+//   1. HTTP Basic auth (enforced when SHIPROCKET_WEBHOOK_BASIC is set)
+//   2. Only orders we know about in RTDB are touched
+//   3. Idempotency key (event id, or SHA-256 of the body) in /webhookEvents
+//   4. Status mapping is keyword-based on known Shiprocket status strings
+// ---------------------------------------------------------------------------
+const STATUS_MAP = [
+  { state: "delivered", order: "delivered", words: ["delivered"] },
+  { state: "out_for_delivery", order: "shipped", words: ["out for delivery"] },
+  { state: "picked_up", order: "shipped", words: ["picked up", "picked", "pickup delayed"] },
+  { state: "in_transit", order: "shipped", words: ["in transit", "shipped", "dispatched", "generated", "scheduled", "unawbed"] },
+  { state: "undelivered", order: "rto", words: ["undelivered"] },
+  { state: "rto", order: "rto", words: ["rto", "lost", "damaged"] },
+];
+
+function classify(payload) {
+  const text = JSON.stringify(payload).toLowerCase();
+  // Order matters: "out for delivery" beats "in transit"; "delivered without a negation".
+  for (const m of STATUS_MAP) {
+    for (const w of m.words) {
+      if (text.includes(w)) {
+        if (!(m.state === "delivered" && (text.includes("undelivered") || text.includes("not delivered")))) {
+          return m;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/** Recursively find the first string value of a key (Shiprocket payloads vary). */
+function findDeep(obj, key) {
+  if (obj == null || typeof obj !== "object") return undefined;
+  if (key in obj) return obj[key];
+  for (const v of Object.values(obj)) {
+    const found = findDeep(v, key);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+/**
+ * Webhook auth: Shiprocket signs webhooks with a shared security token sent
+ * as the `x-api-key` header (their current panel), and older plugs keep the
+ * HTTP Basic "user:pass" scheme. Both are accepted against the SAME secret
+ * — timing-safe compares on both.
+ */
+function secretOk(req, expected) {
+  const apiKey = typeof req.headers["x-api-key"] === "string" ? req.headers["x-api-key"] : "";
+  const a = Buffer.from(apiKey);
+  const b = Buffer.from(expected);
+  if (a.length === b.length && crypto.timingSafeEqual(a, b)) return true;
+
+  const header = req.headers.authorization ?? "";
+  const [scheme, encoded] = header.split(" ");
+  if (scheme !== "Basic" || !encoded) return false;
+  const decoded = Buffer.from(encoded, "base64").toString("utf8");
+  const c = Buffer.from(decoded);
+  return c.length === b.length && crypto.timingSafeEqual(c, b);
+}
+
+export async function shiprocketWebhook(req, res, next) {
+  try {
+    const c = config.shiprocket;
+    if (c.webhookBasic && !secretOk(req, c.webhookBasic)) {
+      return res.status(401).json({ error: "Bad webhook credentials." });
+    }
+
+    const payload = JSON.parse(req.body.toString("utf8"));
+    const match = classify(payload);
+    if (!match) return res.json({ ok: true, ignored: true }); // unknown/irrelevant event
+
+    const eventKeyRaw =
+      findDeep(payload, "event_id") ??
+      findDeep(payload, "id") ??
+      crypto.createHash("sha256").update(req.body).digest("hex");
+    const eventKey = typeof eventKeyRaw === "string" || typeof eventKeyRaw === "number"
+      ? `sr_${eventKeyRaw}`
+      : null;
+    const eventText = payload?.event ?? match.state;
+
+    const orderNumber = [
+      findDeep(payload, "order_number"),
+      findDeep(payload, "order_id"),
+    ]
+      .map(String)
+      .find((v) => /^order_[A-Za-z0-9]{10,}$/.test(v) || v.length > 6);
+    if (!orderNumber) {
+      return res.json({ ok: true, ignored: true });
+    }
+
+    // Dedupe inside a transaction (same pattern as the Razorpay webhook).
+    const dedupeKey = `${eventKey ?? `sr_${crypto.createHash("sha256").update(req.body).digest("hex")}`}`;
+    const claim = await db.ref(`webhookEvents/${dedupeKey}`).transaction((cur) => {
+      if (cur !== null) return;
+      return { receivedAt: Date.now(), event: String(eventText) };
+    });
+    if (!claim.committed) return res.json({ ok: true, deduped: true });
+
+    // Cross-check: only mutate orders that exist in /orders.
+    const orderRef = db.ref(`orders/${orderNumber}`);
+    const snap = await orderRef.get();
+    if (!snap.exists()) {
+      return res.json({ ok: true, ignored: "unknown order" });
+    }
+
+    const patch = {
+      status: match.order,
+      updatedAt: Date.now(),
+      "shiprocket/state": match.state,
+    };
+    const awb = findDeep(payload, "awb") ?? findDeep(payload, "awb_code") ?? findDeep(payload, "courier_awb");
+    if (typeof awb === "string" && awb) patch["shiprocket/awb"] = awb;
+    const courier = findDeep(payload, "courier_name");
+    if (typeof courier === "string" && courier && !patch["shiprocket/courierName"]) {
+      patch["shiprocket/courierName"] = courier;
+    }
+    await orderRef.update(patch);
+
+    // Append a timeline entry for admin visibility (audit trail).
+    await db.ref(`orders/${orderNumber}/shippingTimeline`).push({
+      state: match.state,
+      status: match.order,
+      awb: patch["shiprocket/awb"] ?? "",
+      event: String(eventText),
+      receivedAt: Date.now(),
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /shipping/status — admin diagnostic tool to inspect Shiprocket connection,
+ * credentials, and configured pickup addresses.
+ */
+export async function getShiprocketStatus(req, res, next) {
+  try {
+    await requireAdmin(req);
+    const c = config.shiprocket;
+    if (!c.email || !c.password) {
+      return res.json({
+        configured: false,
+        authenticated: false,
+        message:
+          "Shiprocket credentials (SHIPROCKET_EMAIL / SHIPROCKET_PASSWORD) are not set in the server environment on the VM.",
+      });
+    }
+
+    try {
+      await shiprocketToken();
+      let pickupLocations = [];
+      let pickupError = null;
+      try {
+        const pRes = await srRequest("/settings/company/pickup", {}, { method: "GET" });
+        pickupLocations = (pRes?.data?.shipping_address ?? []).map((addr) => ({
+          location: addr.pickup_location,
+          address: `${addr.address || ""}, ${addr.city || ""}, ${addr.state || ""} ${addr.pin_code || ""}`,
+          phone: addr.phone,
+          isPrimary: addr.is_primary_location === 1,
+        }));
+      } catch (pErr) {
+        pickupError = pErr.message;
+      }
+
+      return res.json({
+        configured: true,
+        authenticated: true,
+        email: c.email,
+        configuredPickupLocation: c.pickupLocation || null,
+        detectedPickupLocations: pickupLocations,
+        ready: pickupLocations.length > 0,
+        pickupError,
+      });
+    } catch (authErr) {
+      return res.json({
+        configured: true,
+        authenticated: false,
+        email: c.email,
+        error: authErr.message,
+        ready: false,
+      });
+    }
+  } catch (err) {
+    next(err);
+  }
+}

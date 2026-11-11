@@ -1,11 +1,19 @@
+import "dotenv/config"; // load server/.env BEFORE any config access
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { config } from "./config.js";
 import { createOrder, verifyPayment } from "./orders.js";
 import { razorpayWebhook } from "./webhooks.js";
+import { fulfill, shippingQuote, shiprocketWebhook, getShiprocketStatus } from "./shiprocket.js";
+import { refundOrder } from "./refunds.js";
 
 const app = express();
+
+// Behind a single reverse proxy (cloudflared tunnel) — lets express-rate-limit
+// see the real client IP via X-Forwarded-For instead of erroring/warning and
+// keying everyone as the same user.
+app.set("trust proxy", 1);
 
 // Minimal security headers (no extra dependency for three headers).
 app.use((_, res, next) => {
@@ -15,14 +23,29 @@ app.use((_, res, next) => {
   next();
 });
 
-// CORS: the Vercel storefront only. Requests without Origin (curl/SSR) pass.
+// CORS: Allow storefronts, admin panel, preview deployments, and localhost.
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://www.timberteak.com",
+  "https://timberteak.com",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+];
+
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin || config.allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(new Error("CORS: origin not allowed."));
+      if (!origin) return cb(null, true);
+      const isAllowed =
+        DEFAULT_ALLOWED_ORIGINS.includes(origin) ||
+        config.allowedOrigins.includes(origin) ||
+        origin.endsWith(".timberteak.com") ||
+        origin.endsWith(".vercel.app");
+      if (isAllowed) return cb(null, true);
+      return cb(null, false);
     },
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "OPTIONS", "HEAD"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
+    credentials: true,
   })
 );
 
@@ -31,6 +54,15 @@ app.get("/healthz", (_, res) => res.json({ ok: true }));
 // Webhook FIRST with a raw-body parser — express.json() must never touch it,
 // or signature verification breaks.
 app.post("/webhooks/razorpay", express.raw({ type: "application/json", limit: "1mb" }), razorpayWebhook);
+
+// Carrier webhooks have no signatures; the raw body is parsed later and
+// needs no JSON middleware — parse inside the handler (body as Buffer).
+// Path deliberately avoids the words Shiprocket forbids in webhook URLs
+// (shiprocket/sr/kr/kartrocket): it's just the courier provider callback.
+app.post("/webhooks/carrier", express.raw({ type: "application/json", limit: "512kb" }), shiprocketWebhook);
+// Health-probes from merchant panels (GET/HEAD) must answer 200, else the
+// panel refuses to save the webhook ("unable to send request …").
+app.get(["/webhooks/carrier", "/health"], (_, res) => res.json({ ok: true }));
 
 app.use(express.json({ limit: "100kb" }));
 
@@ -43,13 +75,17 @@ const paymentLimiter = rateLimit({
 
 app.post("/create-order", paymentLimiter, createOrder);
 app.post("/verify-payment", paymentLimiter, verifyPayment);
+app.post("/shipping/quote", paymentLimiter, shippingQuote);
+app.get("/shipping/status", getShiprocketStatus);
+app.post("/fulfill", paymentLimiter, fulfill);
+app.post("/refund", paymentLimiter, refundOrder);
 
-// JSON error envelope (never leaks stack traces or secrets).
-// eslint-disable-next-line no-unused-vars
+// JSON error envelope (returns clear error message without leaking secrets).
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err, _req, res, _next) => {
   const status = err.status ?? 500;
-  if (status >= 500) console.error(err);
-  res.status(status).json({ error: status >= 500 ? "Internal error." : err.message });
+  if (status >= 500) console.error("[payment-server error]:", err);
+  res.status(status).json({ error: err.message || "Internal error." });
 });
 
 app.listen(config.port, () => {

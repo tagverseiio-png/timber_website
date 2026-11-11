@@ -55,10 +55,13 @@ export function loadRazorpayScript(): Promise<void> {
 }
 
 export async function postToPaymentApi<T>(path: string, body: unknown, idToken?: string): Promise<T> {
-  if (!env.paymentApiUrl) {
-    throw new Error("Payment server is not configured (NEXT_PUBLIC_PAYMENT_API_URL).");
-  }
-  const res = await fetch(`${env.paymentApiUrl.replace(/\/$/, "")}${path}`, {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  // Use same-origin Next.js proxy route to bypass all browser CORS restrictions:
+  const url = typeof window !== "undefined"
+    ? `/api/payment${cleanPath}`
+    : `${(env.paymentApiUrl || "https://pay.timberteak.com").replace(/\/$/, "")}${cleanPath}`;
+
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -66,7 +69,10 @@ export async function postToPaymentApi<T>(path: string, body: unknown, idToken?:
     },
     body: JSON.stringify(body),
   });
-  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error(data.error ?? `Payment request failed (${res.status}).`);
+
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string; message?: string };
+  if (!res.ok) {
+    throw new Error(data.error || data.message || `Payment request failed (${res.status}).`);
+  }
   return data;
 }

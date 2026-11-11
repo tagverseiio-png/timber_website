@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Images, Package, LogOut } from "lucide-react";
+import { ExternalLink, Images, LogOut, Package, ShieldCheck } from "lucide-react";
 
 interface AdminHeaderProps {
   title: string;
@@ -18,27 +19,55 @@ const ADMIN_TABS = [
 
 /**
  * Shared admin header with section navigation between Product Management and
- * Gallery Management, matching the Timber admin dashboard design.
+ * Gallery Management, matching the Executive Admin Console design.
  */
 export function AdminHeader({ title, subtitle, userEmail, onLogout }: AdminHeaderProps) {
   const pathname = usePathname();
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm mb-8">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+    <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="font-serif text-3xl text-timber-darkwood">{title}</h1>
-          <p className="text-gray-500 text-sm mt-1">{subtitle}</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Image
+              src="/images/logo-transparent.png"
+              alt="Timber Logo"
+              width={120}
+              height={38}
+              className="object-contain"
+              priority
+            />
+            <span className="text-[11px] uppercase tracking-widest font-semibold px-2.5 py-1 bg-timber-teal/10 text-timber-teal rounded-full">
+              {title}
+            </span>
+          </div>
+          <p className="text-gray-500 text-xs mt-1">{subtitle}</p>
         </div>
-        <div className="flex items-center gap-4 self-start sm:self-auto">
-          {userEmail && <span className="text-sm font-medium text-gray-700">{userEmail}</span>}
+
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+          <Link
+            href="/"
+            target="_blank"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition"
+          >
+            <span>View Storefront</span>
+            <ExternalLink size={13} />
+          </Link>
+
+          {userEmail && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200/60 rounded-xl text-xs text-emerald-800">
+              <ShieldCheck size={14} className="text-emerald-600" />
+              <span className="font-medium max-w-[170px] truncate">{userEmail}</span>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={onLogout}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition text-sm font-medium"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition"
           >
-            <LogOut className="w-4 h-4" />
-            Logout
+            <LogOut size={13} />
+            <span>Sign Out</span>
           </button>
         </div>
       </div>
@@ -53,10 +82,10 @@ export function AdminHeader({ title, subtitle, userEmail, onLogout }: AdminHeade
             <Link
               key={href}
               href={href}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition ${
                 isActive
-                  ? "bg-timber-darkwood text-timber-beige shadow-sm"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  ? "bg-timber-teal text-white shadow-xs"
+                  : "bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100"
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -68,4 +97,3 @@ export function AdminHeader({ title, subtitle, userEmail, onLogout }: AdminHeade
     </div>
   );
 }
-

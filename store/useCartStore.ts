@@ -49,6 +49,12 @@ export const useCartStore = create<CartState>()(
       clear: () => set({ lines: [] }),
       count: () => get().lines.reduce((n, l) => n + l.qty, 0),
     }),
-    { name: "timber-cart" } // localStorage persistence; totals stay derived, never stored
+    {
+      name: "timber-cart", // localStorage persistence; totals stay derived, never stored
+      // Defer rehydration until the app explicitly calls rehydrate() after
+      // mount — synchronous rehydration at module init renders different HTML
+      // on server vs client and triggers React 19 hydration errors.
+      skipHydration: true,
+    }
   )
 );

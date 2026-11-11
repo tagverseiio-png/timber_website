@@ -11,6 +11,11 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     background_color: "#f5f0e6",
     theme_color: "#2c1e16",
-    icons: [{ src: "/favicon.ico", sizes: "any", type: "image/x-icon" }],
+    // NOTE(manual): replace with a square 192/512px brand icon when one is
+    // made — the current logo is a wide wordmark and looks letterboxed.
+    icons: [
+      { src: "/icon.png", sizes: "any", type: "image/png" },
+      { src: "/icons/favicon-512.png", sizes: "512x512", type: "image/png" },
+    ],
   };
 }

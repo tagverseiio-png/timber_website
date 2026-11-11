@@ -32,6 +32,38 @@ export const productSchema = z.object({
     .refine((v) => v === "" || /^\d+$/.test(v), "Whole units, or leave empty")
     .optional()
     .default(""),
+  /**
+   * Parcel spec for Shiprocket (grams / cm), or empty = unset.
+   * The VM falls back to SHIPROCKET_DEFAULT_WEIGHT_G when weight is unset.
+   */
+  weightGrams: z
+    .string()
+    .trim()
+    .max(7)
+    .refine((v) => v === "" || /^\d+$/.test(v), "Whole grams, or leave empty")
+    .optional()
+    .default(""),
+  lengthCm: z
+    .string()
+    .trim()
+    .max(6)
+    .refine((v) => v === "" || /^\d+$/.test(v), "Whole cm, or leave empty")
+    .optional()
+    .default(""),
+  widthCm: z
+    .string()
+    .trim()
+    .max(6)
+    .refine((v) => v === "" || /^\d+$/.test(v), "Whole cm, or leave empty")
+    .optional()
+    .default(""),
+  heightCm: z
+    .string()
+    .trim()
+    .max(6)
+    .refine((v) => v === "" || /^\d+$/.test(v), "Whole cm, or leave empty")
+    .optional()
+    .default(""),
   orderIndex: z.number().int().nonnegative().default(0),
   isActive: z.boolean().default(true),
 });

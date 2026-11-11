@@ -7,6 +7,7 @@ import { Heart, ShoppingBag, Eye } from "lucide-react";
 import type { CatalogProduct } from "@/lib/products/types";
 import { formatPrice } from "@/lib/money";
 import { useCartStore } from "@/store/useCartStore";
+import { useWishlistStore } from "@/store/useWishlistStore";
 
 interface ProductCardProps {
   product: CatalogProduct;
@@ -18,6 +19,8 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
   const [primary, secondary] = product.images;
   const eyebrow = product.type || product.category;
   const add = useCartStore((s) => s.add);
+  const isWishlisted = useWishlistStore((s) => s.has(product.id));
+  const toggleWishlist = useWishlistStore((s) => s.toggle);
   const soldOut = product.stock === 0;
 
   return (
@@ -77,8 +80,29 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
             <ShoppingBag size={16} />
             <span>{soldOut ? "Sold Out" : "Add to Cart"}</span>
           </button>
-          <button className="w-12 h-12 bg-timber-beige text-timber-darkwood flex items-center justify-center hover:bg-white hover:text-red-500 transition-colors">
-            <Heart size={18} />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleWishlist({
+                id: product.id,
+                name: product.name,
+                pricePaise: product.pricePaise,
+                image: primary || "/images/placeholder.jpg",
+                category: product.category,
+                type: product.type,
+              });
+            }}
+            aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+            title={isWishlisted ? "Remove from wishlist" : "Save to wishlist"}
+            className={`w-12 h-12 flex items-center justify-center transition-colors ${
+              isWishlisted
+                ? "bg-red-50 text-red-600 hover:bg-red-100"
+                : "bg-timber-beige text-timber-darkwood hover:bg-white hover:text-red-500"
+            }`}
+          >
+            <Heart size={18} className={isWishlisted ? "fill-red-600" : ""} />
           </button>
         </div>
 

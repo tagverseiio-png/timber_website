@@ -1,0 +1,37 @@
+# Timber payment VM — Caddy reverse proxy.
+#
+# Caddy owns ports 80/443 and issues/renews the TLS certificate automatically
+# (ACM HTTP-01 via Let's Encrypt). Nothing else needs to be exposed: Node
+# listens on 127.0.0.1:8080 only, per the systemd unit.
+#
+# Replace the site address below with the DNS name that points at the VM's
+# static IP (e.g. pay.yourdomain.com). Caddy re-reads this file on restart:
+#   sudo systemctl reload caddy
+
+pay.example.com {
+	# Site is served HTTPS-only; http:// gets a 308 redirect for free.
+	encode zstd gzip
+
+	# Basic hardening headers for the API surface.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+
+	# Everything goes to the Express app. Webhook bodies (Razorpay/Shiprocket)
+	# must be received verbatim — do NOT enable response/request body transforms.
+	reverse_proxy 127.0.0.1:8080 {
+		# Webhooks can be slow; give them room beyond Caddy's default.
+		transport http {
+			response_header_timeout 30s
+		}
+	}
+
+	log {
+		output file /var/log/caddy/timber-payment.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

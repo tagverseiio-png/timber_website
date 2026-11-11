@@ -3,6 +3,9 @@
 import { useState, FormEvent } from "react";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { Mail, MapPin, Phone, Clock, Send, CheckCircle2 } from "lucide-react";
+import { auth, database } from "@/lib/firebase";
+import { signInAnonymously } from "firebase/auth";
+import { ref, push, serverTimestamp } from "firebase/database";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -12,18 +15,60 @@ export default function ContactPage() {
     subject: "Bespoke Furniture Commission",
     message: "",
   });
+  const [honeypot, setHoneypot] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
+    if (submitting) return;
 
-    // Simulate sending inquiry with smooth feedback
-    setTimeout(() => {
-      setSubmitting(false);
+    // Honeypot spam check: if filled, quietly drop without saving
+    if (honeypot) {
       setSubmitted(true);
-    }, 600);
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      // Require anonymous authentication at minimum to gate bot flood
+      const user = auth.currentUser ?? (await signInAnonymously(auth)).user;
+
+      const name = formData.name.trim();
+      const email = formData.email.trim();
+      const phone = formData.phone.trim();
+      const message = formData.message.trim();
+
+      if (name.length < 2) {
+        throw new Error("Please enter your full name.");
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new Error("Please enter a valid email address.");
+      }
+      if (message.length < 10) {
+        throw new Error("Please provide a message with at least 10 characters.");
+      }
+
+      await push(ref(database, "inquiries"), {
+        name,
+        email,
+        phone,
+        subject: formData.subject,
+        message,
+        status: "new",
+        createdAt: serverTimestamp(),
+        uid: user.uid,
+      });
+
+      setSubmitted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send your inquiry. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -165,6 +210,24 @@ export default function ContactPage() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Anti-spam honeypot - invisible to real humans */}
+                <input
+                  type="text"
+                  name="website"
+                  value={honeypot}
+                  onChange={(e) => setHoneypot(e.target.value)}
+                  tabIndex={-1}
+                  autoComplete="off"
+                  className="hidden"
+                  aria-hidden="true"
+                />
+
+                {error && (
+                  <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
+                    {error}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label htmlFor="inquiry-name" className="block text-xs uppercase tracking-wider text-timber-darkwood font-medium mb-2">

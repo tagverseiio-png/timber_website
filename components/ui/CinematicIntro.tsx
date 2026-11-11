@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { useEffect, useState, useRef, useSyncExternalStore } from "react";
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, MotionValue } from "framer-motion";
 import Image from "next/image";
-import { introImages } from "@/lib/data/introImages";
+import { introImages, type IntroImage } from "@/lib/data/introImages";
 
 // Helper hook to detect if it's a mobile device (rough estimation)
 function useIsMobile() {
@@ -17,7 +17,16 @@ function useIsMobile() {
   return isMobile;
 }
 
-function ParallaxImage({ img, i, phase, smoothMouseX, smoothMouseY, setIsHoveringImage }: any) {
+interface ParallaxImageProps {
+  img: IntroImage;
+  i: number;
+  phase: "logo" | "images" | "exit";
+  smoothMouseX: MotionValue<number>;
+  smoothMouseY: MotionValue<number>;
+  setIsHoveringImage: (hovering: boolean) => void;
+}
+
+function ParallaxImage({ img, i, phase, smoothMouseX, smoothMouseY, setIsHoveringImage }: ParallaxImageProps) {
   const initX = typeof img.initialPos.x === "string" ? parseFloat(img.initialPos.x) : img.initialPos.x;
   const exitX = initX < 0 ? "-150vw" : "150vw";
 
@@ -72,23 +81,22 @@ function ParallaxImage({ img, i, phase, smoothMouseX, smoothMouseY, setIsHoverin
   );
 }
 
+const subscribeNothing = () => () => {};
+function getHasSeenSnapshot(): boolean {
+  try {
+    return typeof window !== "undefined" && sessionStorage.getItem("hasSeenCinematicIntro") === "true";
+  } catch {
+    return false;
+  }
+}
+
 export function CinematicIntro() {
   const [phase, setPhase] = useState<"logo" | "images" | "exit">("logo");
   const [isHoveringImage, setIsHoveringImage] = useState(false);
-  const [shouldRender, setShouldRender] = useState<boolean | null>(null); // null means checking
+  const [isDismissed, setIsDismissed] = useState(false);
+  const hasSeen = useSyncExternalStore(subscribeNothing, getHasSeenSnapshot, () => true);
   const isMobile = useIsMobile();
   const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const hasSeen = sessionStorage.getItem("hasSeenCinematicIntro");
-    if (hasSeen) {
-      setShouldRender(false);
-      window.dispatchEvent(new Event("introComplete"));
-    } else {
-      setShouldRender(true);
-      sessionStorage.setItem("hasSeenCinematicIntro", "true");
-    }
-  }, []);
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -124,7 +132,10 @@ export function CinematicIntro() {
     } else if (phase === "exit") {
       const timer3 = setTimeout(() => {
         window.dispatchEvent(new Event("introComplete"));
-        setShouldRender(false);
+        try {
+          sessionStorage.setItem("hasSeenCinematicIntro", "true");
+        } catch {}
+        setIsDismissed(true);
       }, 800);
       return () => clearTimeout(timer3);
     }
@@ -136,7 +147,7 @@ export function CinematicIntro() {
   }, [phase]);
 
   useEffect(() => {
-    const handleScroll = (e: Event) => {
+    const handleScroll = () => {
       if (phase === "images") {
         setPhase("exit");
       }
@@ -151,10 +162,7 @@ export function CinematicIntro() {
     };
   }, [phase]);
 
-  if (shouldRender === false) return null;
-  if (shouldRender === null) return (
-    <div className="fixed inset-0 z-[200] bg-timber-beige" />
-  );
+  if (hasSeen || isDismissed) return null;
 
   return (
     <motion.div

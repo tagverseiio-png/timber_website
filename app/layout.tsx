@@ -3,7 +3,7 @@ import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { CustomCursor } from "@/components/layout/CustomCursor";
+import { CartHydrator } from "@/components/layout/CartHydrator";
 import { SITE_NAME, canonical, getSiteUrl } from "@/lib/seo";
 
 const inter = Inter({
@@ -41,6 +41,15 @@ export const metadata: Metadata = {
       "Premium handcrafted timber furniture — sustainably sourced solid wood, built for generations.",
     images: [canonical("/images/logo.png")],
   },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+      { url: "/images/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: "/favicon.ico",
+  },
   manifest: "/manifest.webmanifest",
 };
 
@@ -56,7 +65,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${playfair.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans text-timber-darkwood bg-timber-beige">
-        <CustomCursor />
+        <CartHydrator />
         <Navbar />
         <main className="flex-grow pt-24">{children}</main>
         <Footer />

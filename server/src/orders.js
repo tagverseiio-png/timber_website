@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import Razorpay from "razorpay";
 import { config } from "./config.js";
 import { db, auth } from "./firebase.js";
+import { quoteCheapestCourier } from "./shiprocket.js";
 
 export const razorpay = new Razorpay({
   key_id: config.razorpayKeyId,
@@ -50,14 +51,18 @@ function validateItems(body) {
 }
 
 /**
- * POST /create-order — body {items:[{id,qty}]} ONLY. Prices are re-read from
- * RTDB with the Admin SDK and the total is computed here. The client amount
- * is NEVER trusted.
+ * POST /create-order — body {items:[{id,qty}], customer, address} ONLY.
+ * Prices are re-read from RTDB with the Admin SDK and the total is computed
+ * here. The client amount is NEVER trusted. Customer + address are validated
+ * on the VM (never trust the browser) and snapshotted onto the order so
+ * fulfillment has everything it needs even if the client changes later.
  */
 export async function createOrder(req, res, next) {
   try {
     const userId = await requireUserId(req);
     const lines = validateItems(req.body);
+    const customer = validateCustomer(req.body?.customer);
+    const address = validateAddress(req.body?.address);
 
     const snap = await db.ref("projects").get();
     const catalog = snap.val() ?? {};
@@ -80,7 +85,18 @@ export async function createOrder(req, res, next) {
         throw err;
       }
       amountPaise += pricePaise * qty; // integer math only
-      orderItems.push({ id, name, qty, pricePaise });
+      orderItems.push({
+        id,
+        name,
+        qty,
+        pricePaise,
+        // Parcel specs for Shiprocket — snapshotted from the catalog at
+        // order time so later catalog edits never mutate a paid order.
+        weightGrams: row.weightGrams == null ? null : Number(row.weightGrams),
+        lengthCm: row.lengthCm == null ? null : Number(row.lengthCm),
+        widthCm: row.widthCm == null ? null : Number(row.widthCm),
+        heightCm: row.heightCm == null ? null : Number(row.heightCm),
+      });
     }
     if (amountPaise < 100) {
       // Razorpay minimum is ₹1.00.
@@ -88,6 +104,37 @@ export async function createOrder(req, res, next) {
       err.status = 400;
       throw err;
     }
+
+    // Shipping is CHARGED, not eaten: the cheapest courier for the REAL parcel
+    // (per-item weights, real destination pincode). The client amount is never
+    // trusted — this is the single server-side source of truth for the total.
+    const subtotalPaise = amountPaise;
+    let shippingPaise = 0;
+    let shippingCourier = "";
+    let courierEta = "";
+    try {
+      const best = await quoteCheapestCourier(orderItems, address.pincode);
+      if (!best) {
+        const err = new Error(
+          `Sorry — we don't have a courier serving ${address.pincode} right now. Try another pincode or contact us.`
+        );
+        err.status = 400;
+        throw err;
+      }
+      shippingPaise = Math.max(0, Math.round(best.rate * 100));
+      shippingCourier = String(best.name ?? "");
+      courierEta = String(best.etaDate ?? "");
+    } catch (err) {
+      if (err.status === 400) throw err; // unserviceable / bad parcel spec
+      // Shiprocket outage: refuse to create the order rather than silently
+      // ship it free (or fail the charge after the fact).
+      const e = new Error("Shipping pricing is temporarily unavailable — please try again in a minute.");
+      e.status = 502;
+      e.cause = err;
+      console.error("[create-order] shipping quote failed:", err);
+      throw e;
+    }
+    amountPaise += shippingPaise;
 
     const rzOrder = await razorpay.orders.create({
       amount: amountPaise,
@@ -98,23 +145,140 @@ export async function createOrder(req, res, next) {
     const now = Date.now();
     await db.ref(`orders/${rzOrder.id}`).set({
       id: rzOrder.id,
-      status: "pending",
+      receipt: rzOrder.receipt,
+      status: "pending", // → paid → processing → shipped → out_for_delivery → delivered (failed/refunded/rto wrong-way states)
       items: orderItems,
       amountPaise,
+      subtotalPaise,
+      shipping: {
+        paise: shippingPaise,
+        courier: shippingCourier,
+        etaDate: courierEta,
+        model: "cheapest_courier",
+        quotedAt: now,
+      },
       currency: config.currency,
+      customer,
+      address,
       userId,
       createdAt: now,
       updatedAt: now,
     });
 
+    if (userId) {
+      await db.ref(`userOrders/${userId}/${rzOrder.id}`).set({
+        id: rzOrder.id,
+        createdAt: now,
+      });
+    }
+
     res.json({
       orderId: rzOrder.id,
       amount: amountPaise,
+      subtotal: subtotalPaise,
+      shipping: shippingPaise,
+      shippingCourier,
       currency: config.currency,
       keyId: config.razorpayKeyId, // public key only — safe to expose
     });
   } catch (err) {
     next(err);
+  }
+}
+
+function requireText(obj, key, min, max, label) {
+  const value = typeof obj?.[key] === "string" ? obj[key].trim() : "";
+  if (value.length < min || value.length > max) {
+    const err = new Error(`${label}: need ${min}–${max} characters.`);
+    err.status = 400;
+    throw err;
+  }
+  return value;
+}
+
+function optionalText(obj, key, max, label) {
+  const value = typeof obj?.[key] === "string" ? obj[key].trim() : "";
+  if (value.length > max) {
+    const err = new Error(`${label}: max ${max} characters.`);
+    err.status = 400;
+    throw err;
+  }
+  return value;
+}
+
+/**
+ * customer: {name, email?, phone} — guest checkout supported; email is
+ * optional but recommended (Shiprocket uses it for delivery updates).
+ */
+export function validateCustomer(input) {
+  return {
+    name: requireText(input, "name", 2, 80, "Customer name"),
+    email: optionalText(input, "email", 254, "Email"),
+    phone: (() => {
+      const raw = requireText(input, "phone", 10, 15, "Phone");
+      const digits = raw.replace(/[^\d]/g, "");
+      if (!/^(\d{10}|\d{12}|\d{11,13})$/.test(digits)) {
+        const err = new Error("Phone: 10-digit Indian number (or E.164 dial code).");
+        err.status = 400;
+        throw err;
+      }
+      // Keep the last 10 digits — the VM never needs the +91 prefix.
+      return digits.slice(-10);
+    })(),
+  };
+}
+
+/** address: Indian residential address — everything Shiprocket needs. */
+export function validateAddress(input) {
+  return {
+    line1: requireText(input, "line1", 3, 200, "Address line 1"),
+    line2: optionalText(input, "line2", 100, "Address line 2"),
+    city: requireText(input, "city", 2, 80, "City"),
+    state: requireText(input, "state", 2, 80, "State"),
+    pincode: ((v) => {
+      if (!/^[1-9]\d{5}$/.test(v)) {
+        const err = new Error("Pincode: 6 digits, first not 0.");
+        err.status = 400;
+        throw err;
+      }
+      return v;
+    })(requireText(input, "pincode", 6, 6, "Pincode")),
+  };
+}
+/** Authorized admin emails (matches lib/auth/admin.ts) */
+const AUTHORIZED_ADMIN_EMAILS = [
+  "admin@timber_ts.com",
+  "admin@timber-ts.com",
+  "admin@tgtimber.com",
+  "admin@tg-timber.com",
+  "admin@tg.timber",
+  "admin@timberteak.com",
+];
+
+/** Admin-gate: token carries admin:true OR comes from an authorized admin email. */
+export async function requireAdmin(req) {
+  const header = req.headers.authorization ?? "";
+  if (!header.startsWith("Bearer ")) {
+    const err = new Error("Missing Authorization bearer token.");
+    err.status = 401;
+    throw err;
+  }
+  try {
+    const decoded = await auth.verifyIdToken(header.slice(7));
+    const isEmailAdmin =
+      decoded.email &&
+      AUTHORIZED_ADMIN_EMAILS.includes(decoded.email.toLowerCase().trim());
+    if (decoded.admin !== true && !isEmailAdmin) {
+      const err = new Error("Admin only.");
+      err.status = 403;
+      throw err;
+    }
+    return decoded.uid;
+  } catch (err) {
+    if (err.status === 403) throw err;
+    const e = new Error("Invalid auth token.");
+    e.status = 401;
+    throw e;
   }
 }
 
