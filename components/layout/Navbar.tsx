@@ -1,17 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { Search, ShoppingBag, Menu, X, Heart } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { useCartStore } from "@/store/useCartStore";
 
+const emptySubscribe = () => () => {};
+
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const cartCount = useCartStore((s) => s.count());
+  const isMounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+  const rawCartCount = useCartStore((s) => s.count());
+  const cartCount = isMounted ? rawCartCount : 0;
 
   useEffect(() => {
     const handleScroll = () => {

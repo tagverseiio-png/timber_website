@@ -31,6 +31,7 @@ import { formatPrice, rupeesToPaise, paiseToRupees } from "@/lib/money";
 import Image from "next/image";
 import { ALL_PRODUCTS } from "@/app/projects/reference/shop_data_backup";
 import { BOUTIQUE_PRODUCTS } from "@/lib/products/boutique_seed";
+import { AdminHeader } from "@/components/admin/AdminHeader";
 
 const ADMIN_PAGE_SIZE = 12;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -637,21 +638,12 @@ export default function AdminPanel() {
       )}
 
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-lg shadow-sm">
-          <div>
-            <h1 className="font-serif text-3xl text-timber-darkwood">Product Management</h1>
-            <p className="text-gray-500 text-sm mt-1">Firebase Realtime Database · admin-only writes · images as base64 · prices in paise</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-medium text-gray-700">{user.email}</span>
-            <button
-              onClick={() => signOut(auth)}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition text-sm font-medium"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
+        <AdminHeader
+          title="Product Management"
+          subtitle="Firebase Realtime Database · admin-only writes · images as base64 · prices in paise"
+          userEmail={user.email}
+          onLogout={() => signOut(auth)}
+        />
 
         <div className="bg-white p-6 rounded-lg shadow-sm mb-8 border-l-4 border-timber-darkwood">
           <h2 className="text-xl font-serif text-timber-darkwood mb-2">Database Management</h2>
