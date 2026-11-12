@@ -2,10 +2,78 @@
 
 import { useState, FormEvent } from "react";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
-import { Mail, MapPin, Phone, Clock, Send, CheckCircle2 } from "lucide-react";
+import {
+  Mail,
+  MapPin,
+  Phone,
+  Clock,
+  Send,
+  CheckCircle2,
+  ChevronDown,
+  HelpCircle,
+  ArrowDown,
+} from "lucide-react";
 import { auth, database } from "@/lib/firebase";
 import { signInAnonymously } from "firebase/auth";
 import { ref, push, serverTimestamp } from "firebase/database";
+
+interface FAQItem {
+  question: string;
+  answer: string;
+}
+
+const FAQS: FAQItem[] = [
+  {
+    question: "What types of timber products and wooden furniture does Timber offer?",
+    answer:
+      "We offer a curated range of premium timber products and solid wood furniture, crafted to combine quality craftsmanship, long-lasting durability, and timeless design. From living room pieces to custom wooden furniture, our collection is designed to elevate any interior space. Browse our gallery to explore the full range.",
+  },
+  {
+    question: "How can I enquire about a specific timber furniture product?",
+    answer:
+      "You can reach us directly through the contact form on this page or via our listed contact details. Simply share the timber product you’re interested in along with any questions, and our team will respond with all the information you need.",
+  },
+  {
+    question: "Does Timber offer customised or made-to-order wooden furniture?",
+    answer:
+      "Yes, custom timber furniture options can be discussed with our team. Whether you have a specific design, preferred wood type, dimensions, or finish in mind, get in touch and we’ll help you explore what’s possible for your space.",
+  },
+  {
+    question: "How do I choose the right type of timber for my furniture?",
+    answer:
+      "Choosing the right timber depends on several factors, including your interior style, how the piece will be used, your preferred finish, and your budget. Our team is happy to guide you through the available timber options to help you make the best decision for your home or project.",
+  },
+  {
+    question: "Can I request product dimensions, materials, and specifications?",
+    answer:
+      "Absolutely. You can enquire about the full specifications of any timber product — including dimensions, wood species, material details, and available finishes — through our contact page. We’re happy to provide all the information you need before making a decision.",
+  },
+  {
+    question: "What wood finishes are available for timber furniture?",
+    answer:
+      "The right finish can significantly enhance the appearance, texture, and longevity of timber furniture. We offer a variety of wood finish options to suit different aesthetics and functional needs. Contact our team to discuss the finish options available for your selected piece.",
+  },
+  {
+    question: "How do I get a price quotation for timber furniture or products?",
+    answer:
+      "To receive a price quote, simply share your product requirements, preferred timber type, finish, and quantity through our contact form. Our team will get back to you with detailed pricing and quotation information tailored to your needs.",
+  },
+  {
+    question: "Does Timber accept bulk or large-scale timber furniture orders?",
+    answer:
+      "Yes, we welcome bulk purchases and large-scale timber requirements for both residential and commercial projects. Please contact our team with the product details, specifications, and required quantity to discuss the best available arrangements.",
+  },
+  {
+    question: "Does Timber provide delivery for furniture and timber products?",
+    answer:
+      "Delivery availability, charges, and lead times vary depending on the product type and delivery location. Please reach out to our team through the contact page to confirm delivery options and timelines specific to your order.",
+  },
+  {
+    question: "How do I care for and maintain solid timber furniture?",
+    answer:
+      "To keep your timber furniture looking its best, wipe surfaces regularly with a clean, dry cloth, avoid prolonged exposure to direct sunlight and moisture, and use suitable wood-care or conditioning products periodically. Proper care helps preserve the natural beauty and structural integrity of solid wood furniture for years to come.",
+  },
+];
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -19,6 +87,22 @@ export default function ContactPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openFaqs, setOpenFaqs] = useState<number[]>([0]); // First item open initially
+
+  const toggleFaq = (idx: number) => {
+    setOpenFaqs((prev) =>
+      prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]
+    );
+  };
+
+  const allOpen = openFaqs.length === FAQS.length;
+  const toggleAllFaqs = () => {
+    if (allOpen) {
+      setOpenFaqs([]);
+    } else {
+      setOpenFaqs(FAQS.map((_, i) => i));
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -94,7 +178,7 @@ export default function ContactPage() {
           </div>
         </ScrollReveal>
 
-        {/* Address / Timings / Get In Touch */}
+        {/* Address / Timings / Get In Touch / Email */}
         <div className="flex flex-col lg:flex-row gap-16 justify-between">
           {/* Left: Address + Timings */}
           <div className="lg:w-1/2 flex flex-col gap-10">
@@ -167,9 +251,87 @@ export default function ContactPage() {
           </div>
         </div>
 
+        {/* Frequently Asked Questions (FAQ) Section - Placed below the contact context and above the inquiry form */}
+        <ScrollReveal delay={0.2} direction="up" className="mt-24 lg:mt-32">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-10">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-timber-teal/10 text-timber-teal text-xs uppercase tracking-widest font-semibold mb-3">
+                <HelpCircle size={14} />
+                Got Questions?
+              </span>
+              <h2 className="font-serif text-3xl md:text-4xl text-timber-darkwood mb-3">
+                Frequently Asked Questions
+              </h2>
+              <p className="text-timber-muted text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+                Everything you need to know about our handcrafted solid wood furniture, bespoke custom commissions, timber selection, finishes, and order delivery.
+              </p>
+              <div className="mt-4 flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={toggleAllFaqs}
+                  className="text-xs uppercase tracking-wider font-semibold text-timber-teal hover:text-timber-darkwood transition-colors underline underline-offset-4"
+                >
+                  {allOpen ? "Collapse All Questions" : "Expand All Questions"}
+                </button>
+                <span className="text-timber-muted/40">•</span>
+                <a
+                  href="#inquiry-form"
+                  className="inline-flex items-center gap-1 text-xs uppercase tracking-wider font-semibold text-timber-muted hover:text-timber-darkwood transition-colors"
+                >
+                  Jump to Inquiry Form <ArrowDown size={12} />
+                </a>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {FAQS.map((faq, index) => {
+                const isOpen = openFaqs.includes(index);
+                const itemNumber = (index + 1).toString().padStart(2, "0");
+                return (
+                  <div
+                    key={faq.question}
+                    className="border border-timber-darkwood/10 rounded-2xl bg-white/70 backdrop-blur-sm overflow-hidden transition-all duration-300 hover:border-timber-darkwood/25 shadow-xs"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleFaq(index)}
+                      aria-expanded={isOpen}
+                      className="w-full text-left p-6 sm:p-7 flex items-start justify-between gap-4 transition-colors hover:bg-timber-darkwood/5 cursor-pointer"
+                    >
+                      <div className="flex items-start gap-4 sm:gap-5">
+                        <span className="shrink-0 w-8 h-8 rounded-full bg-timber-teal/10 text-timber-teal text-xs font-bold flex items-center justify-center font-mono mt-0.5">
+                          {itemNumber}
+                        </span>
+                        <h3 className="font-serif text-base sm:text-lg text-timber-darkwood font-medium leading-snug">
+                          {faq.question}
+                        </h3>
+                      </div>
+                      <span
+                        className={`shrink-0 w-7 h-7 rounded-full bg-timber-darkwood/5 text-timber-darkwood flex items-center justify-center transition-transform duration-300 mt-0.5 ${
+                          isOpen ? "rotate-180 bg-timber-teal text-white" : ""
+                        }`}
+                      >
+                        <ChevronDown size={16} />
+                      </span>
+                    </button>
+                    {isOpen && (
+                      <div className="px-6 sm:px-7 pb-6 sm:pb-7 pt-1 border-t border-timber-darkwood/5 text-timber-muted text-sm sm:text-base leading-relaxed pl-16 sm:pl-20">
+                        {faq.answer}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </ScrollReveal>
+
         {/* Inquiry Form */}
         <ScrollReveal delay={0.2} direction="up" className="mt-20 lg:mt-28">
-          <div className="max-w-3xl mx-auto bg-white/70 backdrop-blur-sm border border-timber-darkwood/10 rounded-3xl p-8 sm:p-12 shadow-sm">
+          <div
+            id="inquiry-form"
+            className="scroll-mt-28 max-w-3xl mx-auto bg-white/70 backdrop-blur-sm border border-timber-darkwood/10 rounded-3xl p-8 sm:p-12 shadow-sm"
+          >
             <div className="text-center mb-8">
               <span className="text-xs uppercase tracking-widest text-timber-teal font-medium mb-2 block">
                 Get in Touch
