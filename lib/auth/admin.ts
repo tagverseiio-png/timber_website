@@ -1,6 +1,7 @@
 import { getIdTokenResult, type User } from "firebase/auth";
 
 export const AUTHORIZED_ADMIN_EMAILS = [
+  "admin@timber.com",
   "admin@timber_ts.com",
   "admin@timber-ts.com",
   "admin@tgtimber.com",
