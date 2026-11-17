@@ -158,6 +158,9 @@ export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openFaqs, setOpenFaqs] = useState<number[]>([0]); // First item open initially
+  const [hoveredReviewIndex, setHoveredReviewIndex] = useState<number | null>(null);
+
+  const marqueeReviews = [...reviews, ...reviews];
 
   const toggleFaq = (idx: number) => {
     setOpenFaqs((prev) =>
@@ -419,34 +422,61 @@ export default function ContactPage() {
             </p>
           </div>
 
-          <div className="flex gap-6 overflow-x-auto pb-6 pt-2 snap-x -mx-6 px-6 md:-mx-12 md:px-12 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {reviews.map((review, index) => (
-              <div
-                key={index}
-                className="shrink-0 w-[300px] sm:w-[360px] snap-start bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-timber-darkwood/10 transition-all hover:shadow-md hover:border-timber-teal/20 flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <h4 className="font-serif text-base sm:text-lg text-timber-darkwood font-medium">
-                      {review.name}
-                    </h4>
+          {/* Continuous Auto-Scrolling Track with Focus Interaction */}
+          <div
+            className="relative overflow-hidden -mx-6 px-6 md:-mx-12 md:px-12 py-6"
+            onMouseLeave={() => setHoveredReviewIndex(null)}
+          >
+            {/* Subtle Edge Fade Gradients for Seamless Looping */}
+            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-8 md:w-20 bg-gradient-to-r from-timber-beige to-transparent z-10" />
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 md:w-20 bg-gradient-to-l from-timber-beige to-transparent z-10" />
+
+            <div
+              className="flex gap-6 w-max animate-marquee-track"
+              style={{
+                animationPlayState: hoveredReviewIndex !== null ? "paused" : "running",
+              }}
+            >
+              {marqueeReviews.map((review, index) => {
+                const isHovered = hoveredReviewIndex === index;
+                const isAnyHovered = hoveredReviewIndex !== null;
+
+                return (
+                  <div
+                    key={`${review.name}-${index}`}
+                    onMouseEnter={() => setHoveredReviewIndex(index)}
+                    className={`shrink-0 w-[300px] sm:w-[360px] bg-white rounded-2xl p-6 sm:p-8 border border-timber-darkwood/10 flex flex-col justify-between select-none transition-all duration-300 ease-out cursor-default ${
+                      isHovered
+                        ? "scale-105 shadow-xl z-20 border-timber-teal/30 -translate-y-1.5"
+                        : isAnyHovered
+                        ? "scale-[0.96] opacity-60 shadow-xs z-0"
+                        : "scale-100 opacity-100 shadow-sm z-0 hover:border-timber-teal/20"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <h4 className="font-serif text-base sm:text-lg text-timber-darkwood font-medium">
+                          {review.name}
+                        </h4>
+                      </div>
+                      <div className="flex gap-1 mb-4">
+                        {Array.from({ length: review.rating }, (_, i) => (
+                          <span key={i} className="text-yellow-400 text-sm">
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-timber-muted text-sm sm:text-base leading-relaxed mb-4">
+                        &ldquo;{review.text}&rdquo;
+                      </p>
+                    </div>
+                    <p className="text-timber-muted/70 text-xs font-mono">
+                      {review.date}
+                    </p>
                   </div>
-                  <div className="flex gap-1 mb-4">
-                    {Array.from({ length: review.rating }, (_, i) => (
-                      <span key={i} className="text-yellow-400 text-sm">
-                        ★
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-timber-muted text-sm sm:text-base leading-relaxed mb-4">
-                    &ldquo;{review.text}&rdquo;
-                  </p>
-                </div>
-                <p className="text-timber-muted/70 text-xs font-mono">
-                  {review.date}
-                </p>
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
         </section>
 
