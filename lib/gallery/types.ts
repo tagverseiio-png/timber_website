@@ -35,6 +35,7 @@ export const GALLERY_CATEGORIES = [
   "Chest Boxes",
   "Chest of Draws",
   "Diwans",
+  "Misc",
   "Desks & Vanity",
   "Outdoor",
   "Puja Units",

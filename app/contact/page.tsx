@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
+import { motion } from "framer-motion";
 import {
   Mail,
   MapPin,
@@ -31,12 +32,12 @@ const FAQS: FAQItem[] = [
   {
     question: "How can I enquire about a specific timber furniture product?",
     answer:
-      "You can reach us directly through the contact form on this page or via our listed contact details. Simply share the timber product you’re interested in along with any questions, and our team will respond with all the information you need.",
+      "You can reach us directly through the contact form on this page or via our listed contact details. Simply share the timber product you're interested in along with any questions, and our team will respond with all the information you need.",
   },
   {
     question: "Does Timber offer customised or made-to-order wooden furniture?",
     answer:
-      "Yes, custom timber furniture options can be discussed with our team. Whether you have a specific design, preferred wood type, dimensions, or finish in mind, get in touch and we’ll help you explore what’s possible for your space.",
+      "Yes, custom timber furniture options can be discussed with our team. Whether you have a specific design, preferred wood type, dimensions, or finish in mind, get in touch and we'll help you explore what's possible for your space.",
   },
   {
     question: "How do I choose the right type of timber for my furniture?",
@@ -46,7 +47,7 @@ const FAQS: FAQItem[] = [
   {
     question: "Can I request product dimensions, materials, and specifications?",
     answer:
-      "Absolutely. You can enquire about the full specifications of any timber product — including dimensions, wood species, material details, and available finishes — through our contact page. We’re happy to provide all the information you need before making a decision.",
+      "Absolutely. You can enquire about the full specifications of any timber product -- including dimensions, wood species, material details, and available finishes -- through our contact page. We're happy to provide all the information you need before making a decision.",
   },
   {
     question: "What wood finishes are available for timber furniture?",
@@ -73,6 +74,75 @@ const FAQS: FAQItem[] = [
     answer:
       "To keep your timber furniture looking its best, wipe surfaces regularly with a clean, dry cloth, avoid prolonged exposure to direct sunlight and moisture, and use suitable wood-care or conditioning products periodically. Proper care helps preserve the natural beauty and structural integrity of solid wood furniture for years to come.",
   },
+];
+
+const reviews = [
+  {
+    name: "Aravind Rajkumar",
+    rating: 5,
+    text: "This place is a hidden gem! Excellent wooden products, decoration pieces and antiques tucked into shelves all over the store. Deepak and Hema are super patient, helpful and explain every aspect of the pieces.",
+    date: "3 months ago"
+  },
+  {
+    name: "Shivangi Tople",
+    rating: 5,
+    text: "From the moment I walked in, I felt welcomed and valued. The team was incredibly warm, patient, and helpful. They didn't just try to sell a product -- they genuinely helped me find something that matched my style and needs. Every piece reflects attention to detail, elegance, and a passion for creating something special.",
+    date: "5 months ago"
+  },
+  {
+    name: "Ratna Sri",
+    rating: 5,
+    text: "Loved the product -- I ordered a teak wood box. My order was last minute and I wanted delivery in a few hours. The sales and delivery team promptly addressed my request and even hand delivered it directly to my location. Wonderful quality that will last for several decades to come!",
+    date: "1 month ago"
+  },
+  {
+    name: "Deepa Kumaravel",
+    rating: 5,
+    text: "Extremely good furniture and superb service. Makes buying wood a pleasure.",
+    date: "2 months ago"
+  },
+  {
+    name: "N. Dushyanth Subramaniam",
+    rating: 5,
+    text: "Recently I bought a teak wood rocking chair from Timber Nungambakkam. The quality is very sturdy and good. They have a huge variety of antique furnitures. I would recommend this showroom anyday to my known ones.",
+    date: "11 months ago"
+  },
+  {
+    name: "Anil Saraswat",
+    rating: 5,
+    text: "The timber teak is a perfect destination in Chennai for teak wood furniture lovers. Wide range of Indonesian imported collection, huge collection of home decor items. Loved the collection!",
+    date: "3 years ago"
+  },
+  {
+    name: "Srishti R",
+    rating: 5,
+    text: "Very good experience purchasing a wooden table and indoor chairs from Timber. Quality is very good. Customer service was excellent and items were delivered and assembled efficiently. Will surely reach out again.",
+    date: "5 months ago"
+  },
+  {
+    name: "Isha Kalavadia",
+    rating: 5,
+    text: "I recently had the opportunity to explore the teak furniture and wooden décor pieces from Timber, and I am genuinely impressed by the quality, craftsmanship, and attention to detail in every product. Highly recommend.",
+    date: "5 months ago"
+  },
+  {
+    name: "Trisha Jain",
+    rating: 5,
+    text: "It was good visiting the place. The people here are friendly and fun to be with. We got to learn so many new things about furniture. If you're looking for real wooden furniture, do give this place a visit.",
+    date: "1 month ago"
+  },
+  {
+    name: "Venkataramani R",
+    rating: 5,
+    text: "Wonderful place with very good collection of teak wood furniture. Extremely helpful and pleasant team -- Connie and Hema assisted us with all queries and made our purchase a pleasant experience.",
+    date: "7 months ago"
+  },
+  {
+    name: "Charu Latha",
+    rating: 5,
+    text: "Excellent variety of antique furnitures, exclusive design and quality wood. Staff and owner are very friendly and easily reachable for any query. One and only reliable timber shop in Chennai.",
+    date: "1 year ago"
+  }
 ];
 
 export default function ContactPage() {
@@ -307,9 +377,7 @@ export default function ContactPage() {
                         </h3>
                       </div>
                       <span
-                        className={`shrink-0 w-7 h-7 rounded-full bg-timber-darkwood/5 text-timber-darkwood flex items-center justify-center transition-transform duration-300 mt-0.5 ${
-                          isOpen ? "rotate-180 bg-timber-teal text-white" : ""
-                        }`}
+                        className={`shrink-0 w-7 h-7 rounded-full bg-timber-darkwood/5 text-timber-darkwood flex items-center justify-center transition-transform duration-300 mt-0.5 ${isOpen ? "rotate-180 bg-timber-teal text-white" : ""}`}
                       >
                         <ChevronDown size={16} />
                       </span>
@@ -325,6 +393,48 @@ export default function ContactPage() {
             </div>
           </div>
         </ScrollReveal>
+
+        {/* Google Reviews Section */}
+        <div className="mt-24 lg:mt-32 bg-timber-beige">
+          <div className="container mx-auto px-6 md:px-12">
+            <div className="flex items-center gap-2 mb-8">
+              <span className="text-timber-teal text-xl">★</span>
+              <span className="text-2xl font-serif text-timber-darkwood font-bold">4.9</span>
+              <div className="flex items-center justify-center rounded-full bg-red-600 w-8 h-8">
+                G
+              </div>
+              <span className="text-timber-muted text-sm ml-2">Google Reviews</span>
+            </div>
+            <h2 className="font-serif text-2xl text-timber-darkwood mb-6">What Our Customers Say</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {reviews.map((review, index) => (
+                <div
+                  key={index}
+                  className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-timber-darkwood/10 transition-all hover:shadow-md hover:border-timber-teal/20"
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <h4 className="font-serif text-base sm:text-lg text-timber-darkwood">
+                      {review.name}
+                    </h4>
+                  </div>
+                  <div className="flex gap-1 mb-4">
+                    {Array.from({ length: review.rating }, (_, i) => (
+                      <span key={i} className="text-yellow-400 text-xs">
+                        ★
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-timber-muted text-sm sm:text-base line-clamp-3 mb-4">
+                    {review.text}
+                  </p>
+                  <p className="text-timber-muted text-xs">
+                    {review.date}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
 
         {/* Inquiry Form */}
         <ScrollReveal delay={0.2} direction="up" className="mt-20 lg:mt-28">
